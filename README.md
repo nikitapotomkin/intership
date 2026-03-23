@@ -1,16 +1,16 @@
-## hw-1
+# hw-1
 
 Знайти та підготувати кілька прикладів у вигляді коду на ноде  щодо роботи Event Loop, однопоточності та блокування операцій.
 
-# Асинхронний гонщик
+## Асинхронний гонщик
 ```bash
-$ node index.js asyncRacer
+node index.js asyncRacer
 ```
-# Блокуючий таймер
+## Блокуючий таймер
 ```bash
-$ node index.js blockingTimer
+node index.js blockingTimer
 ```
-# Асинхронний файл vs синхронний
+## Асинхронний файл vs синхронний
 ```bash
-$ node index.js fileReadDemo
+node index.js fileReadDemo
 ```
