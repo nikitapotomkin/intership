@@ -22,8 +22,8 @@
 
 1.  **Клонуйте репозиторій:**
     ```bash
-    git clone -b hw-2 [https://github.com/nikitapotomkin/intership.git](https://github.com/nikitapotomkin/intership.git)
-    cd your-repo-name
+    git clone -b hw-2 https://github.com/nikitapotomkin/intership.git
+    cd intership
     ```
 
 2.  **Встановіть залежності:**
