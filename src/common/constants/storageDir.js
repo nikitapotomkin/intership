@@ -1,3 +1,3 @@
-import path from 'path';
+import { resolve } from "path";
 
-export const STORAGE_DIR = path.resolve("storage");
+export const STORAGE_DIR = resolve("storage");

@@ -1,13 +1,13 @@
-import fs from 'fs';
-import path from 'path';
-import { randomUUID } from 'crypto';
-import { redis } from '../config/redis.js';
-import { ValidationError } from '../common/exceptions/validationError.js';
-import { QuotaError } from '../common/exceptions/quotaError.js';
-import { NotFoundError } from '../common/exceptions/notFoundError.js';
-import { AlreadyCompletedError } from '../common/exceptions/alreadyCompletedError.js';
+import fs from "fs";
+import path from "path";
+import { randomUUID } from "crypto";
+import { redis } from "../config/redis.js";
+import { QuotaError } from "../common/exceptions/quotaError.js";
+import { NotFoundError } from "../common/exceptions/notFoundError.js";
+import { AlreadyCompletedError } from "../common/exceptions/alreadyCompletedError.js";
 import { STORAGE_DIR } from "../common/constants/storageDir.js";
-import { STORAGE_QUOTA } from "../common/constants/storageQuota.js";
+import { getStorageQuota } from "../common/constants/storageQuota.js";
+import { ValidationError } from "../common/exceptions/validationError.js";
 
 const SESSION_TTL = 60 * 60 * 24;
 
@@ -16,32 +16,40 @@ const chunkKey = (uploadId, i) => `upload:${uploadId}:chunk:${i}`;
 
 export class UploadService {
   async initUpload({ fileName, fileSize, totalChunks }) {
-    if (!fileName || !fileSize || !totalChunks) throw new ValidationError();
     const cleanedName = this.safeName(fileName);
 
     const used = await this.getStorageUsed();
-    if (used + fileSize > STORAGE_QUOTA) throw new QuotaError(used, fileSize);
+    const storageQuota = await getStorageQuota();
+    if (used + fileSize > storageQuota) throw new QuotaError(used, fileSize);
 
     const uploadId = randomUUID();
 
     await redis.hmset(sessionKey(uploadId), {
-      fileName:cleanedName,
+      fileName: cleanedName,
       fileSize,
       totalChunks,
       receivedChunks: 0,
-      status: 'in_progress',
+      status: "in_progress",
     });
     await redis.expire(sessionKey(uploadId), SESSION_TTL);
-    
+
     return { uploadId };
   }
 
   async saveChunk(uploadId, chunkIndex, chunkData) {
+    if (!Buffer.isBuffer(chunkData) || chunkData.length === 0) {
+      throw new ValidationError("Invalid chunk");
+    }
+
     const session = await this.#getSession(uploadId);
-    if (session.status === 'completed') throw new AlreadyCompletedError();
+    if (session.status === "completed") throw new AlreadyCompletedError();
 
     await redis.setex(chunkKey(uploadId, chunkIndex), SESSION_TTL, chunkData);
-    const receivedChunks = await redis.hincrby(sessionKey(uploadId), 'receivedChunks', 1);
+    const receivedChunks = await redis.hincrby(
+      sessionKey(uploadId),
+      "receivedChunks",
+      1,
+    );
 
     return { receivedChunks, totalChunks: parseInt(session.totalChunks) };
   }
@@ -70,13 +78,15 @@ export class UploadService {
 
     await new Promise((resolve, reject) => {
       writeStream.end();
-      writeStream.on('finish', resolve);
-      writeStream.on('error', reject);
+      writeStream.on("finish", resolve);
+      writeStream.on("error", reject);
     });
 
-    await redis.hset(sessionKey(uploadId), 'status', 'completed');
+    await redis.hset(sessionKey(uploadId), "status", "completed");
 
-    const chunkKeys = Array.from({ length: totalChunks }, (_, i) => chunkKey(uploadId, i));
+    const chunkKeys = Array.from({ length: totalChunks }, (_, i) =>
+      chunkKey(uploadId, i),
+    );
     await redis.del(...chunkKeys);
 
     return { fileName: session.fileName, size: parseInt(session.fileSize) };
@@ -101,7 +111,8 @@ export class UploadService {
 
   async #getSession(uploadId) {
     const session = await redis.hgetall(sessionKey(uploadId));
-    if (!session || Object.keys(session).length === 0) throw new NotFoundError('Session not found');
+    if (!session || Object.keys(session).length === 0)
+      throw new NotFoundError("Session not found");
     return session;
   }
 }

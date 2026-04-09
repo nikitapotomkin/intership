@@ -1,10 +1,9 @@
 import { AppError } from "../exceptions/appError.js";
-import { sendJSON } from "./sendJSON.js";
 
-export function errorHandler(err, res) {
+export function errorHandler(err, req, res, next) {
   if (err instanceof AppError) {
-    return sendJSON(res, err.statusCode, { error: err.message, ...err.data });
+    return res.status(err.statusCode).json({ error: err.message, ...err.data });
   }
   console.error('Unhandled error:', err);
-  sendJSON(res, 500, { error: 'Internal error' });
+  res.status(500).json({ error: 'Internal error' });
 }

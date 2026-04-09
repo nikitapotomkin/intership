@@ -1,0 +1,18 @@
+FROM node:22-slim
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm ci
+
+COPY . .
+
+ENV PORT=4354
+ENV ADMIN_TOKEN=test123
+ENV STORAGE_QUOTA=1073741824
+ENV CHUNK_SIZE=1048576
+
+EXPOSE 4354
+
+CMD ["node", "src/server.js"]

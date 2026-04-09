@@ -3,10 +3,10 @@ import path from "path";
 import { lookup } from "mime-types";
 import { NotFoundError } from "../common/exceptions/notFoundError.js";
 import { STORAGE_DIR } from "../common/constants/storageDir.js";
-import { STORAGE_QUOTA } from "../common/constants/storageQuota.js";
+import { getStorageQuota } from "../common/constants/storageQuota.js";
 
 export class FileService {
-  listFilesWithSummary() {
+  async listFilesWithSummary() {
     const files = fs.readdirSync(STORAGE_DIR).map((fileName) => {
       const filePath = path.join(STORAGE_DIR, fileName);
       const stat = fs.statSync(filePath);
@@ -16,20 +16,21 @@ export class FileService {
         size: stat.size,
         sizeFormatted: this.formatSize(stat.size),
         modified: stat.mtime,
-        mime: lookup(fileName) || 'application/octet-stream'
+        mime: lookup(fileName) || "application/octet-stream",
       };
     });
 
     const storageUsed = files.reduce((sum, f) => sum + f.size, 0);
-    const storagePercent = Math.round((storageUsed / STORAGE_QUOTA) * 100);
+    const storageQuota = await getStorageQuota();
+    const storagePercent = Math.round((storageUsed / storageQuota) * 100);
 
     return {
       files,
       storageUsed,
-      storageQuota: STORAGE_QUOTA,
+      storageQuota,
       storagePercent,
       storageUsedFormatted: this.formatSize(storageUsed),
-      storageQuotaFormatted: this.formatSize(STORAGE_QUOTA),
+      storageQuotaFormatted: this.formatSize(storageQuota),
     };
   }
 
@@ -66,7 +67,7 @@ export class FileService {
   getFileStream(fileName) {
     const filePath = path.join(STORAGE_DIR, fileName);
 
-    if (!fs.existsSync(filePath)) throw new NotFoundError('File not found');
+    if (!fs.existsSync(filePath)) throw new NotFoundError("File not found");
 
     const stat = fs.statSync(filePath);
     const mime = this.getMime(fileName);
@@ -89,10 +90,10 @@ export class FileService {
     };
   }
 
-  deleteFile(fileName) {
+  async deleteFile(fileName) {
     const filePath = path.join(STORAGE_DIR, fileName);
 
-    if (!fs.existsSync(filePath)) throw new NotFoundError('File not found');
+    if (!fs.existsSync(filePath)) throw new NotFoundError("File not found");
 
     fs.unlinkSync(filePath);
 
