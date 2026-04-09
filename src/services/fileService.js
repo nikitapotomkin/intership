@@ -2,9 +2,8 @@ import fs from "fs";
 import path from "path";
 import { lookup } from "mime-types";
 import { NotFoundError } from "../common/exceptions/notFoundError.js";
-
-const STORAGE_DIR = path.resolve("storage");
-const STORAGE_QUOTA = 3 * 1024 * 1024;
+import { STORAGE_DIR } from "../common/constants/storageDir.js";
+import { STORAGE_QUOTA } from "../common/constants/storageQuota.js";
 
 export class FileService {
   listFilesWithSummary() {

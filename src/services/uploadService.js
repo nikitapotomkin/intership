@@ -6,10 +6,10 @@ import { ValidationError } from '../common/exceptions/validationError.js';
 import { QuotaError } from '../common/exceptions/quotaError.js';
 import { NotFoundError } from '../common/exceptions/notFoundError.js';
 import { AlreadyCompletedError } from '../common/exceptions/alreadyCompletedError.js';
+import { STORAGE_DIR } from "../common/constants/storageDir.js";
+import { STORAGE_QUOTA } from "../common/constants/storageQuota.js";
 
-const STORAGE_DIR = path.resolve('storage');
 const SESSION_TTL = 60 * 60 * 24;
-const STORAGE_QUOTA = 3 * 1024 * 1024;
 
 const sessionKey = (uploadId) => `upload:${uploadId}`;
 const chunkKey = (uploadId, i) => `upload:${uploadId}:chunk:${i}`;
@@ -32,7 +32,7 @@ export class UploadService {
       status: 'in_progress',
     });
     await redis.expire(sessionKey(uploadId), SESSION_TTL);
-
+    
     return { uploadId };
   }
 
@@ -55,7 +55,6 @@ export class UploadService {
   async completeUpload(uploadId) {
     const session = await this.#getSession(uploadId);
     const totalChunks = parseInt(session.totalChunks);
-    
     const ext = path.extname(session.fileName);
     const base = path.basename(session.fileName, ext);
     const uniqueFileName = `${base}-${uploadId}${ext}`;

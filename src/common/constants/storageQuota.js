@@ -1,0 +1,1 @@
+export const STORAGE_QUOTA = 50 * 1024 * 1024;
