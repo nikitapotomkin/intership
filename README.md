@@ -164,15 +164,6 @@ GET /files/:fileId/download
 ```
 DELETE /files/:fileId
 ```
-
----
-
-#### Видалити ВСІ файли користувача
-
-```
-DELETE /files/user/all
-```
-
 ---
 
 ## 📊 Квоти
