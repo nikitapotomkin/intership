@@ -63,7 +63,15 @@
 x-email: user@mail.com
 x-password: 123456
 ```
+---
 
+## 🌐 Статичні файли (Frontend)
+
+Проєкт віддає фронтенд як статичні файли через NestJS:
+
+```
+http://localhost:4568/static/file_storage.html
+```
 ---
 
 ## 📡 API Endpoints
