@@ -16,7 +16,6 @@ import * as multer from 'multer';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthGuard } from '../common/guards/auth.guard';
 import { FileService } from './file.service';
-import { pipeline } from 'stream/promises';
 import { UserRecord } from 'src/common/interfaces/user-record.interface';
 import { join } from 'path';
 
@@ -56,7 +55,7 @@ export class FileController {
     @CurrentUser() currentUser: UserRecord,
     @Param('fileId') fileId: string,
   ) {
-    return this.fileService.findOne(currentUser, fileId);
+    return this.fileService.findOne(fileId, currentUser);
   }
 
   @UseGuards(AuthGuard)
@@ -66,7 +65,7 @@ export class FileController {
     @Param('fileId') fileId: string,
     @Res() res: Response,
   ) {
-    const file = await this.fileService.findOne(user, fileId);
+    const file = await this.fileService.findOne(fileId, user);
 
     res.setHeader('Content-Type', file.mimeType);
     res.setHeader(
@@ -95,7 +94,7 @@ export class FileController {
     @CurrentUser() currentUser: UserRecord,
     @Param('fileId') fileId: string,
   ) {
-    await this.fileService.delete(currentUser, fileId);
+    await this.fileService.delete(fileId, currentUser);
 
     return { success: true };
   }
@@ -107,7 +106,7 @@ export class FileController {
     @Param('fileId') fileId: string,
     @Res() res: Response,
   ) {
-    const file = await this.fileService.findOne(user, fileId);
+    const file = await this.fileService.findOne(fileId, user);
 
     const inlineTypes = ['image/', 'application/pdf', 'text/', 'video/'];
     const isInline = inlineTypes.some((type) => file.mimeType.startsWith(type));

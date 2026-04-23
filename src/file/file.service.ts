@@ -44,7 +44,7 @@ export class FileService implements OnModuleInit {
     const originalName = this.fixEncoding(file.originalname);
     const safeName = this.safeName(originalName);
     const storedName = `${randomUUID()}-${safeName}`;
-    const dest = `${this.uploadDir}/${storedName}`;
+    const dest = join(this.uploadDir, storedName);
 
     await this.moveFile(file.path, dest);
 
@@ -75,22 +75,14 @@ export class FileService implements OnModuleInit {
     return this.fileRepository.findByUser(user.id);
   }
 
+  async findAll(): Promise<FileRecord[]> {
+    return this.fileRepository.findAll();
+  }
+
   safeName(name: string) {
     return name
       .replace(/[^a-zA-Z0-9._\-а-яА-ЯіІїЇєЄ\u0400-\u04FF]/gu, '_')
       .replace(/\.\.+/g, '.');
-  }
-
-  async findOne(user: UserRecord, fileId: string) {
-    const file = await this.fileRepository.findById(fileId);
-
-    if (!file) throw new NotFoundException();
-
-    if (file.userId !== user.id) {
-      throw new ForbiddenException();
-    }
-
-    return file;
   }
 
   private fixEncoding(name: string): string {
@@ -101,24 +93,42 @@ export class FileService implements OnModuleInit {
     }
   }
 
-  async getStream(user: UserRecord, fileId: string) {
-    const file = await this.findOne(user, fileId);
-
-    return createReadStream(`${this.uploadDir}/${file.storedName}`);
+  private createFileStream(file: FileRecord) {
+    return createReadStream(join(this.uploadDir, file.storedName));
   }
 
-  async delete(user: UserRecord, fileId: string) {
-    const file = await this.findOne(user, fileId);
-
+  async delete(fileId: string, user?: UserRecord) {
+    const file = await this.findOne(fileId, user);
     await this.fileRepository.delete(file.id);
-    await this.safeDelete(`${this.uploadDir}/${file.storedName}`);
+    await this.safeDelete(join(this.uploadDir, file.storedName));
 
-    const dbUser = await this.userRepository.findById(user.id);
-
+    const dbUser = await this.userRepository.findById(file.userId);
     if (dbUser) {
       dbUser.usedBytes = Math.max(0, dbUser.usedBytes - file.sizeBytes);
       await this.userRepository.update(dbUser);
     }
+  }
+
+  async findOne(fileId: string, user?: UserRecord) {
+    const file = await this.fileRepository.findById(fileId);
+
+    if (!file) throw new NotFoundException();
+
+    if (user && file.userId !== user.id) {
+      throw new ForbiddenException();
+    }
+
+    return file;
+  }
+
+  async getStream(user: UserRecord, fileId: string) {
+    const file = await this.findOne(fileId, user);
+    return this.createFileStream(file);
+  }
+
+  async getStreamById(fileId: string) {
+    const file = await this.findOne(fileId);
+    return this.createFileStream(file);
   }
 
   private async moveFile(src: string, dest: string) {
@@ -137,13 +147,12 @@ export class FileService implements OnModuleInit {
   }
 
   async deleteAllByUser(userId: string) {
-  const files = await this.fileRepository.findByUser(userId);
+    const files = await this.fileRepository.findByUser(userId);
 
-  for (const file of files) {
-    this.safeDelete(join(this.uploadDir,file.storedName))
+    for (const file of files) {
+      this.safeDelete(join(this.uploadDir, file.storedName));
+    }
+
+    await this.fileRepository.deleteByUser(userId);
   }
-
-  await this.fileRepository.deleteByUser(userId);
-
-}
 }

@@ -54,11 +54,11 @@ export class UserRepository implements OnModuleInit, OnModuleDestroy {
   }
 
   async findById(id: string) {
-    return this.db.users.find(u => u.id === id);
+    return this.db.users.find((u) => u.id === id);
   }
 
   async findByEmail(email: string) {
-    return this.db.users.find(u => u.email === email);
+    return this.db.users.find((u) => u.email === email);
   }
 
   async findAll() {
@@ -66,7 +66,7 @@ export class UserRepository implements OnModuleInit, OnModuleDestroy {
   }
 
   async update(user: UserRecord) {
-    const i = this.db.users.findIndex(u => u.id === user.id);
+    const i = this.db.users.findIndex((u) => u.id === user.id);
     if (i !== -1) {
       this.db.users[i] = user;
       await this.persist();
@@ -74,7 +74,7 @@ export class UserRepository implements OnModuleInit, OnModuleDestroy {
   }
 
   async delete(id: string) {
-    this.db.users = this.db.users.filter(u => u.id !== id);
+    this.db.users = this.db.users.filter((u) => u.id !== id);
     await this.persist();
   }
 }

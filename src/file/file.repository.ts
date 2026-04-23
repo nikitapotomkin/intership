@@ -54,20 +54,24 @@ export class FileRepository implements OnModuleInit, OnModuleDestroy {
   }
 
   async findById(id: string) {
-    return this.db.files.find(f => f.id === id);
+    return this.db.files.find((f) => f.id === id);
   }
 
   async findByUser(userId: string) {
-    return this.db.files.filter(f => f.userId === userId);
+    return this.db.files.filter((f) => f.userId === userId);
+  }
+
+  async findAll() {
+    return this.db.files;
   }
 
   async delete(id: string) {
-    this.db.files = this.db.files.filter(f => f.id !== id);
+    this.db.files = this.db.files.filter((f) => f.id !== id);
     await this.persist();
   }
 
   async deleteByUser(userId: string) {
-    this.db.files = this.db.files.filter(f => f.userId !== userId);
+    this.db.files = this.db.files.filter((f) => f.userId !== userId);
     await this.persist();
   }
 }

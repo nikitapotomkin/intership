@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -14,10 +15,13 @@ import { FileService } from 'src/file/file.service';
 export class UserService {
   constructor(
     private readonly userRepository: UserRepository,
-     private readonly fileService:FileService,
+    private readonly fileService: FileService,
   ) {}
 
-  async createUser(dto: CreateUserDto): Promise<Omit<UserRecord, 'password'>> {
+  async createUser(
+    dto: CreateUserDto,
+    role: 'user' | 'admin' = 'user',
+  ): Promise<Omit<UserRecord, 'password'>> {
     const existing = await this.userRepository.findByEmail(dto.email);
 
     if (existing) {
@@ -31,12 +35,14 @@ export class UserService {
       id: randomUUID(),
       email: dto.email,
       password,
-      quotaBytes: dto.quotaMb * 1024 * 1024,
+      role,
+      isBlocked: false,
+      quotaBytes: 30 * 1024 * 1024,
       usedBytes: 0,
       createdAt: new Date().toISOString(),
     };
 
-    this.userRepository.create(user);
+    await this.userRepository.create(user);
     return this.sanitize(user);
   }
 
@@ -51,12 +57,38 @@ export class UserService {
     return this.sanitize(user);
   }
 
-  async deleteUser(id: string) {
-    const user = await this.userRepository.findById(id);
+  async updateUser(
+    targetUserId: string,
+    dto: Partial<UserRecord>,
+    currentUser: UserRecord,
+  ) {
+    const user = await this.userRepository.findById(targetUserId);
 
     if (!user) {
-      throw new NotFoundException(`User ${id} not found`);
+      throw new NotFoundException(`User ${targetUserId} not found`);
     }
+
+    const isAdmin = currentUser.role === 'admin';
+    const isOwner = currentUser.id === targetUserId;
+
+    if (!isAdmin && !isOwner) {
+      throw new ForbiddenException();
+    }
+
+    const safeDto = Object.fromEntries(
+      Object.entries(dto).filter(([, value]) => value !== undefined),
+    );
+
+    Object.assign(user, safeDto);
+
+    await this.userRepository.update(user);
+
+    return this.sanitize(user);
+  }
+
+  async deleteUser(id: string) {
+    const user = await this.userRepository.findById(id);
+    if (!user) throw new NotFoundException(`User ${id} not found`);
 
     await this.fileService.deleteAllByUser(id);
     await this.userRepository.delete(id);
@@ -68,6 +100,4 @@ export class UserService {
     const { password, ...safe } = user;
     return safe;
   }
-
-  
 }
