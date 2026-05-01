@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  ADMIN
+  MODERATOR
+}
+
+model User {
+  id            Int       @id @default(autoincrement()) @map("id")
+  username      String?   @unique @map("username")
+  password      String?   @map("password")
+  email         String?   @unique @map("email")
+  isBanned      Boolean   @default(false) @map("is_banned")
+  isDeleted     Boolean   @default(false) @map("is_deleted")
+  banEndAt      DateTime? @map("ban_end_at")
+  role          Role      @default(USER)
+  lastLoginIP   String?   @map("last_login_ip")
+  lastLoginAt   DateTime? @default(now()) @map("last_login_at")
+  createdAt     DateTime? @default(now()) @map("created_at")
+  updatedAt     DateTime? @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  profile Profile?
+  address Address?
+
+  @@index([username])
+  @@index([email])
+  @@index([createdAt])
+  @@index([lastLoginIP])
+  @@map("users")
+}
+
+model Profile {
+  userId    Int      @id @map("user_id")
+  rating    Int      @map("rating")
+  balance   Decimal  @default(0) @map("balance") @db.Decimal(18, 6)
+  avatar    String?  @map("avatar")
+  level     Int      @default(0) @map("level")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([level])
+  @@index([rating])
+  @@map("profiles")
+}
+
+model Address {
+  userId      Int      @id @map("user_id")
+  firstName   String   @map("first_name")
+  lastName    String   @map("last_name")
+  phoneNumber String   @map("phone_number")
+  address     String   @map("address")
+  address2    String?  @map("address2")
+  country     String?  @map("country")
+  postalCode  String   @map("postal_code")
+  city        String   @map("city")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([country])
+  @@index([city])
+  @@map("addresses")
+}
