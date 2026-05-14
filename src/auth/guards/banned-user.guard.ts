@@ -13,7 +13,7 @@ export class BannedUserGuard implements CanActivate {
     if (!user) return true;
 
     if (user.isDeleted) {
-      throw new ForbiddenException('Account has been deleted');
+      throw new ForbiddenException('Account is deleted');
     }
 
     if (user.isBanned) {

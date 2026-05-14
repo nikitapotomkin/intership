@@ -2,11 +2,11 @@ import { ApiProperty } from "@nestjs/swagger";
 import { IsEmail, IsString } from "class-validator";
 
 export class RestoreAccountDto {
-  @ApiProperty({ example: 'player@game.com' })
+  @ApiProperty({ example: 'player123@gmail.com' })
   @IsEmail()
   email: string;
  
-  @ApiProperty({ example: 'Secret@123' })
+  @ApiProperty({ example: 'Wrty@123' })
   @IsString()
   password: string;
 }

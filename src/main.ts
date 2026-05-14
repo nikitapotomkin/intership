@@ -5,20 +5,27 @@ import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/utils/exeption-filter';
 import { ConfigService } from '@nestjs/config';
 import { REDIS_CLIENT } from './redis/redis.module';
-import * as cookieParser from 'cookie-parser';
+//import * as cookieParser from 'cookie-parser';
 import IORedis from 'ioredis';
 import { RedisStore } from 'connect-redis';
 import { parseBoolean } from './common/utils/parse-boolean';
-import * as session from 'express-session';
+//import * as session from 'express-session';
+import * as express from 'express';
+import cookieParser from 'cookie-parser';
+import session from 'express-session';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    rawBody: true,
+  });
 
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   const config = app.get(ConfigService);
 
   const redis = app.get<IORedis>(REDIS_CLIENT);
+
+  app.use('/payment/webhook/stripe', express.raw({ type: 'application/json' }));
 
   app.setGlobalPrefix('api/v1');
 
@@ -72,9 +79,12 @@ async function bootstrap() {
       type: 'apiKey',
       in: 'cookie',
     })
-    .addTag('Auth', 'Registration, login, refresh')
-    .addTag('User', 'User info')
-    .addTag('Admin', 'Admin panel: user management')
+    .addTag('Auth', 'Registration, login, logout, session management')
+    .addTag('User', 'Profile, address, password management')
+    .addTag('Admin', 'User management, bans, roles, platform statistics')
+    .addTag('Wallet', 'Balance, transaction history, withdrawal requests')
+    .addTag('Payment', 'Deposits via provider, webhook handling')
+    .addTag('Roulette', 'Game sessions, bets, spin, provably fair verification')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

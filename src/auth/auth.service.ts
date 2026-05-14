@@ -78,20 +78,21 @@ export class AuthService {
       },
     });
 
-    const {user:safeUser} = this.buildResponse(user);
+    const { user: safeUser } = this.buildResponse(user);
 
     return await this.saveSession(req, safeUser);
   }
 
-  async restore(req:Request,dto: RestoreAccountDto) {
+  async restore(req: Request, dto: RestoreAccountDto) {
     const user = await this.userRepository.findUnique({
       where: { email: dto.email },
     });
 
-    if (!user) throw new NotFoundException('User not found');
+    if (!user || !user.password)
+      throw new UnauthorizedException('Invalid credentials');
     if (!user.isDeleted) throw new ConflictException('Account is not deleted');
 
-    const valid = await verify(dto.password, user.password ?? '');
+    const valid = await verify(user.password, dto.password);
     if (!valid) throw new UnauthorizedException('Invalid credentials');
 
     const restored = await this.userRepository.update({
@@ -99,11 +100,9 @@ export class AuthService {
       data: { isDeleted: false, deletedAt: null },
       include: { profile: true, address: true },
     });
-    
-    const {user:safeUser} = this.buildResponse(restored);
 
-    return await this.saveSession(req, safeUser);
-
+    const { user: safeUser } = this.buildResponse(restored);
+    return this.saveSession(req, safeUser);
   }
 
   async logout(req: Request, res: Response): Promise<void> {
@@ -128,7 +127,7 @@ export class AuthService {
 
       req.session.save((err) => {
         if (err) {
-          console.log(err,user)
+          console.log(err, user);
           return reject(
             new InternalServerErrorException(
               `Failed to save session. Check if session parameters are configured correctly.`,

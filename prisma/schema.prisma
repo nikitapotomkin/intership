@@ -11,29 +11,61 @@ datasource db {
   provider = "postgresql"
 }
 
+enum WithdrawStatus {
+  PENDING   
+  APPROVED   
+  REJECTED  
+}
+
 enum Role {
   USER
   ADMIN
   MODERATOR
 }
 
-model User {
-  id            Int       @id @default(autoincrement()) @map("id")
-  username      String?   @unique @map("username")
-  password      String?   @map("password")
-  email         String?   @unique @map("email")
-  isBanned      Boolean   @default(false) @map("is_banned")
-  isDeleted     Boolean   @default(false) @map("is_deleted")
-  banEndAt      DateTime? @map("ban_end_at")
-  role          Role      @default(USER)
-  lastLoginIP   String?   @map("last_login_ip")
-  lastLoginAt   DateTime? @default(now()) @map("last_login_at")
-  createdAt     DateTime? @default(now()) @map("created_at")
-  updatedAt     DateTime? @updatedAt @map("updated_at")
-  deletedAt     DateTime? @map("deleted_at")
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  BET
+  WIN
+  REFUND
+}
 
-  profile Profile?
-  address Address?
+enum BetType {
+  NUMBER
+  COLOR
+  ODD_EVEN
+  DOZEN
+  COLUMN
+  HIGH_LOW
+}
+
+enum RoundStatus {
+  PENDING
+  SPINNING
+  FINISHED
+}
+
+model User {
+  id          Int       @id @default(autoincrement()) @map("id")
+  username    String?   @unique @map("username")
+  password    String?   @map("password")
+  email       String?   @unique @map("email")
+  isBanned    Boolean   @default(false) @map("is_banned")
+  isDeleted   Boolean   @default(false) @map("is_deleted")
+  banEndAt    DateTime? @map("ban_end_at")
+  role        Role      @default(USER)
+  lastLoginIP String?   @map("last_login_ip")
+  lastLoginAt DateTime? @default(now()) @map("last_login_at")
+  createdAt   DateTime? @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  profile      Profile?
+  address      Address?
+  bets         RouletteBet[]
+  gameSessions GameSession[]
+  withdrawRequests WithdrawRequest[]
 
   @@index([username])
   @@index([email])
@@ -45,13 +77,15 @@ model User {
 model Profile {
   userId    Int      @id @map("user_id")
   rating    Int      @map("rating")
+  stripeCustomerId String? @unique @map("stripe_customer_id")
   balance   Decimal  @default(0) @map("balance") @db.Decimal(18, 6)
   avatar    String?  @map("avatar")
   level     Int      @default(0) @map("level")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user         User          @relation(fields: [userId], references: [id])
+  transactions Transaction[]
 
   @@index([level])
   @@index([rating])
@@ -76,4 +110,92 @@ model Address {
   @@index([country])
   @@index([city])
   @@map("addresses")
+}
+
+model Transaction {
+  id            String          @id @default(uuid())
+  walletId      Int             @map("wallet_id")
+  type          TransactionType
+  amount        Decimal         @db.Decimal(18, 2)
+  balanceBefore Decimal         @map("balance_before") @db.Decimal(18, 2)
+  balanceAfter  Decimal         @map("balance_after") @db.Decimal(18, 2)
+  referenceId   String?         @map("reference_id")
+  referenceType String?         @map("reference_type")
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  wallet Profile @relation(fields: [walletId], references: [userId])
+
+  @@index([walletId, createdAt(sort: Desc)])
+  @@index([referenceId])
+  @@map("transactions")
+}
+
+model RouletteRound {
+  id            String      @id @default(uuid())
+  status        RoundStatus @default(PENDING)
+  winningNumber Int?        @map("winning_number")
+  winningColor  String?     @map("winning_color")
+  gameSessionId String      @unique @map("game_session_id")
+  startedAt     DateTime    @default(now()) @map("started_at")
+  finishedAt    DateTime?   @map("finished_at")
+
+  gameSession GameSession   @relation(fields: [gameSessionId], references: [id])
+  bets        RouletteBet[]
+
+  @@index([status])
+  @@index([startedAt(sort: Desc)])
+  @@map("roulette_rounds")
+}
+
+model RouletteBet {
+  id        String   @id @default(uuid())
+  roundId   String   @map("round_id")
+  userId    Int      @map("user_id")
+  betType   BetType  @map("bet_type")
+  betValue  String   @map("bet_value")
+  amount    Decimal  @db.Decimal(18, 2)
+  payout    Decimal? @db.Decimal(18, 2)
+  isWin     Boolean? @map("is_win")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  round RouletteRound @relation(fields: [roundId], references: [id])
+  user  User          @relation(fields: [userId], references: [id])
+
+  @@index([roundId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("roulette_bets")
+}
+
+model GameSession {
+  id         String   @id @default(uuid())
+  userId     Int      @map("user_id")
+  serverSeed String   @map("server_seed")
+  serverHash String   @map("server_hash")
+  clientSeed String?  @map("client_seed")
+  nonce      Int      @default(0)
+  isRevealed Boolean  @default(false) @map("is_revealed")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user  User           @relation(fields: [userId], references: [id])
+  round RouletteRound?
+
+  @@index([userId])
+  @@map("game_sessions")
+}
+
+model WithdrawRequest {
+  id        String         @id @default(uuid())
+  userId    Int            @map("user_id")
+  amount    Decimal        @db.Decimal(18, 2)
+  status    WithdrawStatus @default(PENDING)
+  cardLast4 String?        @map("card_last4")  // останні 4 цифри картки
+  comment   String?        // причина відхилення
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@map("withdraw_requests")
 }

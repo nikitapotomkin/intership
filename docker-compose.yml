@@ -45,24 +45,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    env_file:
+    - .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      NODE_ENV: ${NODE_ENV}
-      PORT: ${PORT}
-      COOKIES_SECRET: ${COOKIES_SECRET}
-      SESSION_SECRET: ${SESSION_SECRET}
-      SESSION_NAME: ${SESSION_NAME}
-      SESSION_DOMAIN: ${SESSION_DOMAIN}
-      SESSION_MAX_AGE_30DAYS: ${SESSION_MAX_AGE_30DAYS}
-      SESSION_HTTP_ONLY: ${SESSION_HTTP_ONLY}
-      SESSION_SECURE: ${SESSION_SECURE}
-      SESSION_FOLDER: ${SESSION_FOLDER}
     ports:
       - '${PORT}:${PORT}'
-    command: >
-      sh -c "npx prisma migrate deploy && node dist/main.js"
 
 volumes:
   postgres_data:

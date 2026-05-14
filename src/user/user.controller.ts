@@ -21,20 +21,21 @@ import {
   ApiCookieAuth,
 } from '@nestjs/swagger';
 import { UserService } from './user.service';
-import { UpdateProfileDto } from './dto/updateAddress.dto';
-import { ChangePasswordDto } from './dto/changePassword.dto';
-import { UpsertAddressDto } from './dto/upsertAddress.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpsertAddressDto } from './dto/upsert-address.dto';
 import { Request } from 'express';
 import { Public } from 'src/common/decorators/public-decorator';
 import { Put } from '@nestjs/common';
 import { User } from '@prisma/client';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { WalletService } from 'src/wallet/wallet.service';
 
 @ApiTags('User')
 @ApiCookieAuth('connect.sid')
 @Controller('users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(private readonly userService: UserService,private readonly walletService:WalletService) {}
 
   @Get()
   @Public()
@@ -64,6 +65,14 @@ export class UserController {
   @ApiOkResponse({ description: 'Full user object (no password)' })
   getMe(@CurrentUser() user: User) {
     return this.userService.getMe(user.id);
+  }
+
+  @Get('address')
+  @ApiOperation({ summary: 'Get my delivery address' })
+  @ApiOkResponse({ description: 'Address object' })
+  @ApiNotFoundResponse({ description: 'Address not found' })
+  getAddress(@CurrentUser() user: User) {
+    return this.userService.getAddress(user.id);
   }
 
   @Get(':id')
@@ -106,14 +115,6 @@ export class UserController {
   @ApiOkResponse({ description: 'Account deleted message' })
   deleteAccount(@CurrentUser() user: User) {
     return this.userService.deleteAccount(user.id);
-  }
- 
-  @Get('address')
-  @ApiOperation({ summary: 'Get my delivery address' })
-  @ApiOkResponse({ description: 'Address object' })
-  @ApiNotFoundResponse({ description: 'Address not found' })
-  getAddress(@CurrentUser() user: User) {
-    return this.userService.getAddress(user.id);
   }
  
   @Put('address')

@@ -5,6 +5,7 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  Res,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,7 +19,7 @@ import {
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { ResponseDto } from './dto/response.dto';
 import { RestoreAccountDto } from './dto/restore-account.dto';
 import { Public } from 'src/common/decorators/public-decorator';
@@ -55,12 +56,25 @@ export class AuthController {
   @ApiOperation({
     summary: 'Restore a soft-deleted account',
     description:
-      'Verifies the user\'s credentials and un-marks `isDeleted`. ' +
+      "Verifies the user's credentials and un-marks `isDeleted`. " +
       'Returns a new session on success.',
   })
   @ApiOkResponse({ type: ResponseDto })
   @ApiUnauthorizedResponse({ description: 'Invalid credentials' })
-  restore(@Req() req:Request, @Body() dto: RestoreAccountDto) {
-    return this.authService.restore(req,dto);
+  restore(@Req() req: Request, @Body() dto: RestoreAccountDto) {
+    return this.authService.restore(req, dto);
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Logout',
+    description: 'Destroys the session and clears the session cookie.',
+  })
+  @ApiOkResponse({ description: '{ success: true }' })
+  @ApiUnauthorizedResponse({ description: 'Not authenticated' })
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    await this.authService.logout(req, res);
+    return { success: true };
   }
 }

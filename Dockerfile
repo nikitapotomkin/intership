@@ -6,7 +6,6 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-RUN npx prisma generate
 RUN npm run build
 
 FROM node:22-alpine AS production
@@ -14,14 +13,14 @@ FROM node:22-alpine AS production
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/node_modules ./node_modules
 
-EXPOSE 2345
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
-CMD ["node", "dist/main.js"]
+CMD ["./entrypoint.sh"]
