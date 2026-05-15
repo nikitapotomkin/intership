@@ -1,4 +1,3 @@
-// create-withdraw.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNumber, IsPositive, IsString, Length, Max } from 'class-validator';
 

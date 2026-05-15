@@ -17,10 +17,6 @@ export function hashServerSeed(serverSeed: string): string {
   return createHash('sha256').update(serverSeed).digest('hex');
 }
 
-/**
- * Provably Fair spin
- * result = HMAC-SHA256(serverSeed, clientSeed:nonce) → число 0-36
- */
 export function computeSpin(
   serverSeed: string,
   clientSeed: string,
@@ -30,7 +26,6 @@ export function computeSpin(
   const message = `${clientSeed}:${nonce}`;
   const hmac = createHmac('sha256', serverSeed).update(message).digest('hex');
 
-  // Беремо перші 8 символів hex → число 0..2^32-1
   const decimal = parseInt(hmac.slice(0, 8), 16);
   const number = decimal % 37; // 0-36
 
@@ -42,10 +37,6 @@ export function computeSpin(
   return { number, color };
 }
 
-/**
- * Підрахунок виплати
- * Повертає суму виплати (включаючи початкову ставку) або 0
- */
 export function calculatePayout(
   betType: string,
   betValue: string,
@@ -89,9 +80,6 @@ export function calculatePayout(
     }
 
     case 'COLUMN': {
-      // Колонка 1: 1,4,7,10,13,16,19,22,25,28,31,34
-      // Колонка 2: 2,5,8,11,14,17,20,23,26,29,32,35
-      // Колонка 3: 3,6,9,12,15,18,21,24,27,30,33,36
       if (number === 0) return 0;
       const col = ((number - 1) % 3) + 1;
       return col === parseInt(betValue) ? amount * 3 : 0;

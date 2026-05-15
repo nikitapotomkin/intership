@@ -28,8 +28,6 @@ import { SetClientSeedDto } from './dto/set-client-seed.dto';
 export class RouletteController {
   constructor(private readonly rouletteService: RouletteService) {}
 
-  // ─── Provably Fair / Session ───────────────────────────────────────────────
-
   @Get('session')
   @ApiOperation({
     summary: 'Get or create active game session',
@@ -57,8 +55,6 @@ export class RouletteController {
     return this.rouletteService.setClientSeed(user.id, dto);
   }
 
-  // ─── Round ────────────────────────────────────────────────────────────────
-
   @Post('round')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -82,7 +78,6 @@ export class RouletteController {
     return this.rouletteService.getCurrentRound(user.id);
   }
 
-  // ─── Bet ──────────────────────────────────────────────────────────────────
 
   @Post('bet')
   @HttpCode(HttpStatus.OK)
@@ -111,8 +106,6 @@ export class RouletteController {
     return this.rouletteService.placeBet(user.id, dto);
   }
 
-  // ─── Spin ─────────────────────────────────────────────────────────────────
-
   @Post('spin')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -129,7 +122,6 @@ export class RouletteController {
     return this.rouletteService.spin(user.id);
   }
 
-  // ─── History & Verify ─────────────────────────────────────────────────────
 
   @Get('history')
   @ApiOperation({ summary: 'Get my round history with bets' })

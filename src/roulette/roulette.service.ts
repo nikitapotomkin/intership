@@ -35,7 +35,7 @@ export class RouletteService {
       where: {
         userId,
         isRevealed: false,
-        round: { is: null }, // немає прив'язаного раунду
+        round: { is: null },
       },
     });
 

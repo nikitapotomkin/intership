@@ -31,7 +31,6 @@ export class WalletService {
 
   async deposit(userId: number, amount:number) {
     return this.prisma.$transaction(async (tx) => {
-      // SELECT FOR UPDATE — захист від race condition
       const profile = await tx.$queryRaw<{ balance: Decimal }[]>`
         SELECT balance FROM profiles WHERE user_id = ${userId} FOR UPDATE
       `;
@@ -59,7 +58,6 @@ export class WalletService {
     });
   }
 
-  // Внутрішній метод — використовується RouletteService
   async deductBet(
     tx: any,
     userId: number,
@@ -100,7 +98,6 @@ export class WalletService {
 
   async createWithdrawRequest(userId: number, dto: CreateWithdrawDto) {
     return this.prisma.$transaction(async (tx) => {
-      // Перевіряємо баланс і списуємо одразу
       const profile = await tx.$queryRaw<{ balance: Decimal }[]>`
         SELECT balance FROM profiles WHERE user_id = ${userId} FOR UPDATE
       `;
@@ -120,7 +117,6 @@ export class WalletService {
         data: { balance: balanceAfter },
       });
 
-      // Транзакція типу WITHDRAWAL (гроші заморожені)
       await tx.transaction.create({
         data: {
           walletId: userId,
@@ -132,7 +128,6 @@ export class WalletService {
         },
       });
 
-      // Створюємо заявку
       return tx.withdrawRequest.create({
         data: {
           userId,
@@ -174,7 +169,6 @@ export class WalletService {
       throw new BadRequestException('Request already reviewed');
     }
 
-    // Якщо REJECTED — повертаємо баланс
     if (dto.status === WithdrawStatus.REJECTED) {
       await this.prisma.$transaction(async (tx) => {
         const profile = await tx.$queryRaw<{ balance: Decimal }[]>`
@@ -206,7 +200,6 @@ export class WalletService {
         });
       });
     } else {
-      // APPROVED — просто оновлюємо статус, гроші вже списані
       await this.withdrawRequestRepository.update({
         where: { id: requestId },
         data: { status: dto.status, comment: dto.comment },
@@ -215,7 +208,7 @@ export class WalletService {
 
     return { message: `Request ${dto.status.toLowerCase()}` };
   }
-  // Внутрішній метод — виплата виграшу
+ 
   async creditWin(
     tx: any,
     userId: number,
