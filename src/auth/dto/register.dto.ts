@@ -12,12 +12,15 @@ export class RegisterDto {
   @IsString()
   @MinLength(3)
   @MaxLength(32)
+  @Matches(/^[a-zA-Z0-9_-]+$/, {
+    message: 'Username can only contain letters, numbers, _ and -',
+  })
   username: string;
- 
+
   @ApiProperty({ example: 'player123@gmail.com' })
   @IsEmail()
   email: string;
- 
+
   @ApiProperty({
     example: 'Wrty@123',
     description: 'Min 8 chars, at least 1 uppercase, 1 number, 1 special char',
@@ -31,4 +34,3 @@ export class RegisterDto {
   })
   password: string;
 }
- 

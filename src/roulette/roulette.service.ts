@@ -12,13 +12,13 @@ import { RouletteBetRepository } from './repositories/roulette-bet.repository';
 import { GameSessionRepository } from './repositories/game-session.repository';
 import { PlaceBetDto } from './dto/place-bet.dto';
 import { SetClientSeedDto } from './dto/set-client-seed.dto';
-import {
-  generateServerSeed,
-  hashServerSeed,
-  computeSpin,
-  calculatePayout,
-} from './provably-fair.helper';
-import { BetResult } from './types/bet-results.type';
+import { BetResult } from './types/bet-result.type';
+import { createHash, randomBytes, createHmac } from 'crypto';
+import { SpinResult } from './types/spin-result.type';
+import { RED_NUMBERS, ROULETTE_NUMBERS_COUNT } from './constants/roulette.constants';
+
+
+
 
 @Injectable()
 export class RouletteService {
@@ -39,16 +39,27 @@ export class RouletteService {
       },
     });
 
-    if (existing) return { id: existing.id, serverHash: existing.serverHash, clientSeed: existing.clientSeed, nonce: existing.nonce };
+    if (existing)
+      return {
+        id: existing.id,
+        serverHash: existing.serverHash,
+        clientSeed: existing.clientSeed,
+        nonce: existing.nonce,
+      };
 
-    const serverSeed = generateServerSeed();
-    const serverHash = hashServerSeed(serverSeed);
+    const serverSeed = this.generateServerSeed();
+    const serverHash = this.hashServerSeed(serverSeed);
 
     const session = await this.sessionRepository.create({
       data: { userId, serverSeed, serverHash },
     });
 
-    return { id: session.id, serverHash: session.serverHash, clientSeed: session.clientSeed, nonce: session.nonce };
+    return {
+      id: session.id,
+      serverHash: session.serverHash,
+      clientSeed: session.clientSeed,
+      nonce: session.nonce,
+    };
   }
 
   async setClientSeed(userId: number, dto: SetClientSeedDto) {
@@ -69,14 +80,21 @@ export class RouletteService {
     const session = await this.sessionRepository.findOne({
       where: { userId, isRevealed: false, round: { is: null } },
     });
-    if (!session) throw new NotFoundException('No active session. Call GET /roulette/session first.');
+    if (!session)
+      throw new NotFoundException(
+        'No active session. Call GET /roulette/session first.',
+      );
 
     const round = await this.roundRepository.create({
       data: {
         gameSessionId: session.id,
         status: RoundStatus.PENDING,
       },
-      include: { gameSession: { select: { serverHash: true, clientSeed: true, nonce: true } } },
+      include: {
+        gameSession: {
+          select: { serverHash: true, clientSeed: true, nonce: true },
+        },
+      },
     });
 
     return round;
@@ -90,7 +108,9 @@ export class RouletteService {
       },
       include: {
         bets: { where: { userId } },
-        gameSession: { select: { serverHash: true, clientSeed: true, nonce: true } },
+        gameSession: {
+          select: { serverHash: true, clientSeed: true, nonce: true },
+        },
       },
     });
     if (!round) throw new NotFoundException('No active round');
@@ -106,7 +126,9 @@ export class RouletteService {
     });
 
     if (!round) {
-      throw new BadRequestException('No active round. Call POST /roulette/round first.');
+      throw new BadRequestException(
+        'No active round. Call POST /roulette/round first.',
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -120,7 +142,12 @@ export class RouletteService {
         },
       });
 
-      await this.walletService.deductBet(tx, userId, new Decimal(dto.amount), bet.id);
+      await this.walletService.deductBet(
+        tx,
+        userId,
+        new Decimal(dto.amount),
+        bet.id,
+      );
 
       return bet;
     });
@@ -139,15 +166,15 @@ export class RouletteService {
     });
 
     if (!round) throw new NotFoundException('No pending round');
-    if (!round.bets.length) throw new BadRequestException('Place at least one bet before spinning');
+    if (!round.bets.length)
+      throw new BadRequestException('Place at least one bet before spinning');
 
     const session = round.gameSession;
     const clientSeed = session.clientSeed ?? 'default-client-seed';
 
-    const result = computeSpin(session.serverSeed, clientSeed, session.nonce);
+    const result = this.computeSpin(session.serverSeed, clientSeed, session.nonce);
 
     return this.prisma.$transaction(async (tx) => {
-
       await tx.rouletteRound.update({
         where: { id: round.id },
         data: {
@@ -160,7 +187,7 @@ export class RouletteService {
 
       const betResults: BetResult[] = [];
       for (const bet of round.bets) {
-        const payout = calculatePayout(
+        const payout = this.calculatePayout(
           bet.betType,
           bet.betValue,
           Number(bet.amount),
@@ -174,7 +201,12 @@ export class RouletteService {
         });
 
         if (isWin) {
-          await this.walletService.creditWin(tx, userId, new Decimal(payout), bet.id);
+          await this.walletService.creditWin(
+            tx,
+            userId,
+            new Decimal(payout),
+            bet.id,
+          );
         }
 
         betResults.push({ betId: bet.id, isWin, payout });
@@ -204,7 +236,13 @@ export class RouletteService {
       include: {
         bets: { where: { userId } },
         gameSession: {
-          select: { serverSeed: true, serverHash: true, clientSeed: true, nonce: true, isRevealed: true },
+          select: {
+            serverSeed: true,
+            serverHash: true,
+            clientSeed: true,
+            nonce: true,
+            isRevealed: true,
+          },
         },
       },
       orderBy: { startedAt: 'desc' },
@@ -221,12 +259,14 @@ export class RouletteService {
 
     if (!round) throw new NotFoundException('Round not found');
     if (!round.gameSession.isRevealed) {
-      throw new BadRequestException('Round is not finished yet — serverSeed not revealed');
+      throw new BadRequestException(
+        'Round is not finished yet — serverSeed not revealed',
+      );
     }
 
     const session = round.gameSession;
     const clientSeed = session.clientSeed ?? 'default-client-seed';
-    const computed = computeSpin(session.serverSeed, clientSeed, session.nonce);
+    const computed = this.computeSpin(session.serverSeed, clientSeed, session.nonce);
 
     return {
       roundId: round.id,
@@ -242,5 +282,86 @@ export class RouletteService {
         computed.number === round.winningNumber &&
         computed.color === round.winningColor,
     };
+  }
+
+  generateServerSeed(): string {
+    return randomBytes(32).toString('hex');
+  }
+
+  hashServerSeed(serverSeed: string): string {
+    return createHash('sha256').update(serverSeed).digest('hex');
+  }
+
+  computeSpin(
+    serverSeed: string,
+    clientSeed: string,
+    nonce: number,
+  ): SpinResult {
+    const message = `${clientSeed}:${nonce}`;
+    const hmac = createHmac('sha256', serverSeed).update(message).digest('hex');
+
+    const decimal = parseInt(hmac.slice(0, 8), 16);
+    const number = decimal % ROULETTE_NUMBERS_COUNT;
+
+    let color: 'red' | 'black' | 'green';
+    if (number === 0) color = 'green';
+    else if (RED_NUMBERS.has(number)) color = 'red';
+    else color = 'black';
+
+    return { number, color };
+  }
+
+  calculatePayout(
+    betType: string,
+    betValue: string,
+    amount: number,
+    result: SpinResult,
+  ): number {
+    const { number, color } = result;
+
+    switch (betType) {
+      case 'NUMBER':
+        return parseInt(betValue) === number ? amount * 36 : 0;
+
+      case 'COLOR':
+        return betValue === color ? amount * 2 : 0;
+
+      case 'ODD_EVEN': {
+        if (number === 0) return 0;
+        const isOdd = number % 2 !== 0;
+        return (betValue === 'odd' && isOdd) || (betValue === 'even' && !isOdd)
+          ? amount * 2
+          : 0;
+      }
+
+      case 'HIGH_LOW': {
+        if (number === 0) return 0;
+        const isLow = number >= 1 && number <= 18;
+        return (betValue === '1-18' && isLow) ||
+          (betValue === '19-36' && !isLow)
+          ? amount * 2
+          : 0;
+      }
+
+      case 'DOZEN': {
+        const ranges: Record<string, [number, number]> = {
+          '1-12': [1, 12],
+          '13-24': [13, 24],
+          '25-36': [25, 36],
+        };
+        const range = ranges[betValue];
+        if (!range) return 0;
+        return number >= range[0] && number <= range[1] ? amount * 3 : 0;
+      }
+
+      case 'COLUMN': {
+        if (number === 0) return 0;
+        const col = ((number - 1) % 3) + 1;
+        return col === parseInt(betValue) ? amount * 3 : 0;
+      }
+
+      default:
+        return 0;
+    }
   }
 }

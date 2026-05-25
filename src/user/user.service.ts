@@ -7,7 +7,6 @@ import {
 } from '@nestjs/common';
 import { UserRepository } from './repositories/user.repository';
 import { verify, hash } from 'argon2';
-import { ChangePasswordDto } from './dto/change-password.dto';
 import { ProfileRepository } from './repositories/profile.repository';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpsertAddressDto } from './dto/upsert-address.dto';
@@ -61,7 +60,7 @@ export class UserService {
     return user;
   }
 
-  async getMe(userId: number) {
+  async findMe(userId: number) {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       include: { profile: true, address: true },
@@ -91,26 +90,7 @@ export class UserService {
       await this.profileRepository.update(id, { avatar: dto.avatar });
     }
 
-    return this.getMe(id);
-  }
-
-  async changePassword(id: number, dto: ChangePasswordDto) {
-    const user = await this.userRepository.findUnique({ where: { id: id } });
-    if (!user?.password) throw new NotFoundException('User not found');
-
-    const valid = await verify(dto.currentPassword, user.password);
-    if (!valid)
-      throw new UnauthorizedException('Current password is incorrect');
-
-    const hashed = await hash(dto.newPassword);
-    await this.userRepository.update({
-      where: { id },
-      data: {
-        password: hashed,
-      },
-    });
-
-    return { message: 'Password changed successfully' };
+    return this.findMe(id);
   }
 
   async deleteAccount(id: number) {
@@ -126,7 +106,7 @@ export class UserService {
     };
   }
 
-  async getAddress(userId: number) {
+  async findAddress(userId: number) {
     const address = await this.addressRepository.findUnique({
       where: { userId },
     });
@@ -147,7 +127,7 @@ export class UserService {
     return { message: 'Address deleted' };
   }
 
-  async listUsers(query: ListUsersQueryDto) {
+  async findAllAdmin(query: ListUsersQueryDto) {
     const { skip = 0, take = 20, role, isBanned, isDeleted, search } = query;
 
     const where: any = {};

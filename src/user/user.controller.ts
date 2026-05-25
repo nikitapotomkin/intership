@@ -22,7 +22,6 @@ import {
 } from '@nestjs/swagger';
 import { UserService } from './user.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpsertAddressDto } from './dto/upsert-address.dto';
 import { Request } from 'express';
 import { Public } from 'src/common/decorators/public-decorator';
@@ -64,7 +63,7 @@ export class UserController {
   })
   @ApiOkResponse({ description: 'Full user object (no password)' })
   getMe(@CurrentUser() user: User) {
-    return this.userService.getMe(user.id);
+    return this.userService.findMe(user.id);
   }
 
   @Get('address')
@@ -72,7 +71,7 @@ export class UserController {
   @ApiOkResponse({ description: 'Address object' })
   @ApiNotFoundResponse({ description: 'Address not found' })
   getAddress(@CurrentUser() user: User) {
-    return this.userService.getAddress(user.id);
+    return this.userService.findAddress(user.id);
   }
 
   @Get(':id')
@@ -94,15 +93,6 @@ export class UserController {
   @ApiOkResponse({ description: 'Updated user object' })
   updateProfile(@CurrentUser() user: User, @Body() dto: UpdateProfileDto) {
     return this.userService.updateProfile(user.id, dto);
-  }
- 
-  @Patch('me/password')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Change password' })
-  @ApiOkResponse({ description: '{ message: "Password changed successfully" }' })
-  @ApiUnauthorizedResponse({ description: 'Current password is incorrect' })
-  changePassword(@CurrentUser() user: User, @Body() dto: ChangePasswordDto) {
-    return this.userService.changePassword(user.id, dto);
   }
  
   @Delete()

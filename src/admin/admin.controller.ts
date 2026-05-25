@@ -24,7 +24,7 @@ import {
   ApiBadRequestResponse,
 } from '@nestjs/swagger';
 import { Role, WithdrawStatus } from '@prisma/client';
-import { ListUsersQueryDto } from '../user/dto/list-users-query.dto';
+import { ListUsersQueryDto } from 'src/user/dto/list-users-query.dto';
 import { UpdateUserDto } from '../user/dto/update-user.dto';
 import { AdjustBalanceDto } from '../user/dto/adjust-balance.dto';
 import { Roles } from 'src/common/decorators/roles.decorator';
@@ -53,8 +53,8 @@ export class AdminController {
       '`isDeleted`, and full-text `search` by username/email.',
   })
   @ApiOkResponse({ description: '{ data: User[], total, skip, take }' })
-  listUsers(@Query() query: ListUsersQueryDto) {
-    return this.userService.listUsers(query);
+  findAllUsers(@Query() query: ListUsersQueryDto) {
+    return this.userService.findAllAdmin(query);
   }
 
   @Get('users/stats')
@@ -105,6 +105,7 @@ export class AdminController {
   ) {
     return this.userService.updateUser(id, dto);
   }
+  
   @Delete('users/:id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Soft-delete a user account' })
