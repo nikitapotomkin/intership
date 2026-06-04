@@ -1,0 +1,1 @@
+export type RoomPhase = 'BETTING' | 'SPINNING' | 'RESULTS' | 'WAITING';

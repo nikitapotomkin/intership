@@ -3,11 +3,14 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { TransactionType, WithdrawStatus } from '@prisma/client';
+import {
+  TransactionType,
+  WithdrawStatus,
+  TransactionStatus,
+} from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/client';
 import { PrismaService } from 'src/database/prisma.service';
 import { TransactionRepository } from './repositories/transaction.repository';
-import { DepositDto } from 'src/payment/dto/deposit.dto';
 import { WithdrawRequestRepository } from './repositories/withdraw-request.repository';
 import { CreateWithdrawDto } from './dto/create-withdraw.dto';
 import { ReviewWithdrawDto } from './dto/review-withdraw.dto';
@@ -17,7 +20,7 @@ export class WalletService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly transactionRepository: TransactionRepository,
-    private readonly withdrawRequestRepository:WithdrawRequestRepository 
+    private readonly withdrawRequestRepository: WithdrawRequestRepository,
   ) {}
 
   async getBalance(userId: number) {
@@ -29,7 +32,12 @@ export class WalletService {
     return { balance: profile.balance };
   }
 
-  async deposit(userId: number, amount:number) {
+  async deposit(
+    userId: number,
+    amount: number,
+    providerId: number,
+    externalId?: string,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const profile = await tx.$queryRaw<{ balance: Decimal }[]>`
         SELECT balance FROM profiles WHERE user_id = ${userId} FOR UPDATE
@@ -49,21 +57,18 @@ export class WalletService {
         data: {
           walletId: userId,
           type: TransactionType.DEPOSIT,
-          amount:decimalAmount,
+          status: TransactionStatus.COMPLETED,
+          providerId,
+          amount: decimalAmount,
           balanceBefore,
+          externalId,
           balanceAfter,
-          referenceType: 'deposit',
         },
       });
     });
   }
 
-  async deductBet(
-    tx: any,
-    userId: number,
-    amount: Decimal,
-    betId: string,
-  ) {
+  async deductBet(tx: any, userId: number, amount: Decimal, betId: string) {
     const profile = await tx.$queryRaw<{ balance: Decimal }[]>`
       SELECT balance FROM profiles WHERE user_id = ${userId} FOR UPDATE
     `;
@@ -85,11 +90,10 @@ export class WalletService {
       data: {
         walletId: userId,
         type: TransactionType.BET,
+        status: TransactionStatus.COMPLETED,
         amount,
         balanceBefore,
         balanceAfter,
-        referenceId: betId,
-        referenceType: 'bet',
       },
     });
 
@@ -99,8 +103,8 @@ export class WalletService {
   async createWithdrawRequest(userId: number, dto: CreateWithdrawDto) {
     return this.prisma.$transaction(async (tx) => {
       const profile = await tx.$queryRaw<{ balance: Decimal }[]>`
-        SELECT balance FROM profiles WHERE user_id = ${userId} FOR UPDATE
-      `;
+      SELECT balance FROM profiles WHERE user_id = ${userId} FOR UPDATE
+    `;
       if (!profile.length) throw new NotFoundException('Wallet not found');
 
       const balanceBefore = new Decimal(profile[0].balance);
@@ -117,14 +121,14 @@ export class WalletService {
         data: { balance: balanceAfter },
       });
 
-      await tx.transaction.create({
+      const transaction = await tx.transaction.create({
         data: {
           walletId: userId,
           type: TransactionType.WITHDRAWAL,
+          status: TransactionStatus.PENDING,
           amount,
           balanceBefore,
-          balanceAfter,
-          referenceType: 'withdraw_request',
+          balanceAfter
         },
       });
 
@@ -134,6 +138,7 @@ export class WalletService {
           amount,
           cardLast4: dto.cardLast4,
           status: WithdrawStatus.PENDING,
+          transactionId: transaction.id,
         },
       });
     });
@@ -164,16 +169,29 @@ export class WalletService {
     });
 
     if (!request) throw new NotFoundException('Withdraw request not found');
-
     if (request.status !== WithdrawStatus.PENDING) {
       throw new BadRequestException('Request already reviewed');
     }
 
-    if (dto.status === WithdrawStatus.REJECTED) {
+    if (dto.status === WithdrawStatus.APPROVED) {
+      await this.prisma.$transaction(async (tx) => {
+        if (request.transactionId) {
+          await tx.transaction.update({
+            where: { id: request.transactionId },
+            data: { status: TransactionStatus.COMPLETED },
+          });
+        }
+
+        await tx.withdrawRequest.update({
+          where: { id: requestId },
+          data: { status: dto.status, comment: dto.comment },
+        });
+      });
+    } else if (dto.status === WithdrawStatus.REJECTED) {
       await this.prisma.$transaction(async (tx) => {
         const profile = await tx.$queryRaw<{ balance: Decimal }[]>`
-          SELECT balance FROM profiles WHERE user_id = ${request.userId} FOR UPDATE
-        `;
+        SELECT balance FROM profiles WHERE user_id = ${request.userId} FOR UPDATE
+      `;
         const balanceBefore = new Decimal(profile[0].balance);
         const balanceAfter = balanceBefore.plus(request.amount);
 
@@ -182,39 +200,35 @@ export class WalletService {
           data: { balance: balanceAfter },
         });
 
+        if (request.transactionId) {
+          await tx.transaction.update({
+            where: { id: request.transactionId },
+            data: { status: TransactionStatus.CANCELED },
+          });
+        }
+
         await tx.transaction.create({
           data: {
             walletId: request.userId,
             type: TransactionType.REFUND,
+            status: TransactionStatus.COMPLETED,
             amount: request.amount,
             balanceBefore,
-            balanceAfter,
-            referenceId: request.id,
-            referenceType: 'withdraw_rejected',
+            balanceAfter
           },
         });
-        
+
         await tx.withdrawRequest.update({
           where: { id: requestId },
           data: { status: dto.status, comment: dto.comment },
         });
       });
-    } else {
-      await this.withdrawRequestRepository.update({
-        where: { id: requestId },
-        data: { status: dto.status, comment: dto.comment },
-      });
     }
 
     return { message: `Request ${dto.status.toLowerCase()}` };
   }
- 
-  async creditWin(
-    tx: any,
-    userId: number,
-    amount: Decimal,
-    betId: string,
-  ) {
+
+  async creditWin(tx: any, userId: number, amount: Decimal, betId: string) {
     const profile = await tx.$queryRaw<{ balance: Decimal }[]>`
       SELECT balance FROM profiles WHERE user_id = ${userId} FOR UPDATE
     `;
@@ -230,11 +244,10 @@ export class WalletService {
       data: {
         walletId: userId,
         type: TransactionType.WIN,
+        status: TransactionStatus.COMPLETED,
         amount,
         balanceBefore,
         balanceAfter,
-        referenceId: betId,
-        referenceType: 'win',
       },
     });
 

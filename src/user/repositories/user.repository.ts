@@ -7,8 +7,8 @@ export class UserRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(args: Prisma.UserCreateArgs): Promise<User> {
-  return this.prisma.user.create(args);
-}
+    return this.prisma.user.create(args);
+  }
 
   async findOne(args: Prisma.UserFindFirstArgs): Promise<User | null> {
     return this.prisma.user.findFirst(args);
@@ -18,13 +18,15 @@ export class UserRepository {
     return this.prisma.user.findMany(args);
   }
 
-  async findUnique(args: Prisma.UserFindUniqueArgs): Promise<User | null> {
-    return this.prisma.user.findUnique(args);
+  async findUnique<T extends Prisma.UserFindUniqueArgs>(
+    args: T,
+  ): Promise<Prisma.UserGetPayload<T> | null> {
+    return this.prisma.user.findUnique(args) as any;
   }
-
+  
   async update(args: Prisma.UserUpdateArgs): Promise<User> {
-  return this.prisma.user.update(args);
-}
+    return this.prisma.user.update(args);
+  }
 
   async count(where?: Prisma.UserWhereInput): Promise<number> {
     return this.prisma.user.count({ where });

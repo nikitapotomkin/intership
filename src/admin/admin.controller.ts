@@ -31,6 +31,9 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { UserService } from 'src/user/user.service';
 import { WalletService } from 'src/wallet/wallet.service';
 import { ReviewWithdrawDto } from 'src/wallet/dto/review-withdraw.dto';
+import { CreateRoomDto } from 'src/live-roulette/dto/create-room.dto';
+import { LiveRouletteRoomService } from 'src/live-roulette/live-roulette-room.service';
+import { LiveRouletteService } from 'src/live-roulette/live-roulette.service';
 
 @ApiTags('Admin')
 @ApiCookieAuth('connect.sid')
@@ -42,6 +45,8 @@ export class AdminController {
   constructor(
     private readonly userService: UserService,
     private readonly walletService: WalletService,
+    private readonly liveRouletteRoomService: LiveRouletteRoomService,
+    private readonly liveRouletteService: LiveRouletteService,
   ) {}
 
   @Get('users')
@@ -105,7 +110,7 @@ export class AdminController {
   ) {
     return this.userService.updateUser(id, dto);
   }
-  
+
   @Delete('users/:id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Soft-delete a user account' })
@@ -130,7 +135,6 @@ export class AdminController {
   }
 
   @Get('withdrawals')
-  @Roles(Role.ADMIN)
   @ApiOperation({
     summary: 'List all withdrawal requests',
     description:
@@ -155,7 +159,6 @@ export class AdminController {
   }
 
   @Patch('withdrawals/:id')
-  @Roles(Role.ADMIN)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Approve or reject a withdrawal request',
@@ -174,5 +177,53 @@ export class AdminController {
     @Body() dto: ReviewWithdrawDto,
   ) {
     return this.walletService.reviewWithdrawRequest(id, dto);
+  }
+
+  @Post('rooms')
+  @Roles(Role.MODERATOR)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a new live roulette room (admin)' })
+  async createRoom(@Body() dto: CreateRoomDto) {
+    const state = await this.liveRouletteRoomService.createRoom(dto);
+    this.liveRouletteService.startRoomLoop(state.roomId);
+    return state;
+  }
+
+  @Post('rooms/:roomId/start')
+  @Roles(Role.MODERATOR)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Manually start the game loop for a room (admin)' })
+  startRoom(@Param('roomId') roomId: string) {
+    this.liveRouletteService.startRoomLoop(roomId);
+    return { message: `Loop started for room ${roomId}` };
+  }
+
+  @Post('rooms/:roomId/stop')
+  @Roles(Role.MODERATOR)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Stop the game loop for a room (admin)' })
+  stopRoom(@Param('roomId') roomId: string) {
+    this.liveRouletteService.stopRoomLoop(roomId);
+    return { message: `Loop stopped for room ${roomId}` };
+  }
+
+  @Delete('rooms/:roomId')
+  @Roles(Role.MODERATOR)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete a room (admin)' })
+  async deleteRoom(@Param('roomId') roomId: string) {
+    this.liveRouletteService.stopRoomLoop(roomId);
+    await this.liveRouletteRoomService.deleteRoom(roomId);
+    return { message: 'Room deleted' };
+  }
+
+  @Patch('rooms/:roomId/deactivate')
+  @Roles(Role.MODERATOR)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Deactivate a room (admin)' })
+  async deactivateRoom(@Param('roomId') roomId: string) {
+    this.liveRouletteService.stopRoomLoop(roomId);
+    await this.liveRouletteRoomService.deactivateRoom(roomId);
+    return { message: 'Room deactivated' };
   }
 }

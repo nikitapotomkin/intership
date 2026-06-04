@@ -13,7 +13,7 @@ import { RestoreAccountDto } from './dto/restore-account.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ConfigService } from '@nestjs/config';
-import { TokenType, User } from '@prisma/client';
+import { AuthProvider, TokenType, User } from '@prisma/client';
 import { UserRepository } from 'src/user/repositories/user.repository';
 import { MailerService } from 'src/mailer/mailer.service';
 import { randomUUID } from 'crypto';
@@ -22,6 +22,7 @@ import { VerifyEmailDto } from './dto/verify-email.dto';
 import { OAuthUserData } from './types/oauth-user-data.type';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UserProviderRepository } from './repositories/user-provider.repository';
 
 @Injectable()
 export class AuthService {
@@ -30,6 +31,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly mailerService: MailerService,
     private readonly tokenRepository: TokenRepository,
+    private readonly userProviderRepository: UserProviderRepository,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -63,33 +65,50 @@ export class AuthService {
   async validateOAuthUser(oauthUserData: OAuthUserData) {
     const { provider, providerId, email, username, avatar } = oauthUserData;
 
-    let user = await this.userRepository.findOne({
-      where: { provider: provider, providerId: providerId },
+    const userProvider = await this.userProviderRepository.findUnique({
+      where: {
+        provider_providerId: {
+          provider: provider as AuthProvider,
+          providerId,
+        },
+      },
+      include: {
+        user: {
+          include: { profile: true },
+        },
+      },
+    });
+
+    if (userProvider) return this.buildResponse(userProvider.user);
+
+    const existingUser = await this.userRepository.findUnique({
+      where: { email },
       include: { profile: true },
     });
 
-    if (user) return this.buildResponse(user);
-
-    const existsByEmail = await this.userRepository.findOne({
-      where: { email },
-    });
-
-    if (existsByEmail) {
-      throw new ConflictException(
-        'Email already registered. Please login with password.',
-      );
+    if (existingUser) {
+      await this.userProviderRepository.create({
+        data: {
+          userId: existingUser.id,
+          provider: provider as AuthProvider,
+          providerId,
+        },
+      });
+      return this.buildResponse(existingUser);
     }
 
-    user = await this.userRepository.create({
+    const user = await this.userRepository.create({
       data: {
-        email: email,
+        email,
         username: await this.generateUniqueUsername(username),
-        provider: provider,
-        providerId: providerId,
         isVerified: true,
         profile: {
+          create: { avatar },
+        },
+        providers: {
           create: {
-            avatar,
+            provider: provider as AuthProvider,
+            providerId,
           },
         },
       },
@@ -295,9 +314,8 @@ export class AuthService {
 
   async resetPassword(dto: ResetPasswordDto) {
     const existingUser = await this.userRepository.findUnique({
-      where: {
-        email: dto.email,
-      },
+      where: { email: dto.email },
+      include: { providers: true },
     });
 
     if (!existingUser) {
@@ -306,7 +324,7 @@ export class AuthService {
       );
     }
 
-    if (existingUser.provider !== null) {
+    if (existingUser.providers.length > 0) {
       throw new ForbiddenException("You can't change your password");
     }
 

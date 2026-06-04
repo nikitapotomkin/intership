@@ -7,7 +7,7 @@ import { AdminModule } from './admin/admin.module';
 import { RedisModule } from './redis/redis.module';
 import { WalletModule } from './wallet/wallet.module';
 import { PaymentModule } from './payment/payment.module';
-import { RouletteModule } from './roulette/roulette.module';
+import { LiveRouletteModule } from './live-roulette/live-roulette.module';
 
 @Module({
   imports: [
@@ -18,8 +18,8 @@ import { RouletteModule } from './roulette/roulette.module';
     WalletModule,
     PaymentModule,
     AdminModule,
-    RouletteModule,
-    RedisModule
+    RedisModule,
+    LiveRouletteModule
   ],
 })
 export class AppModule {}

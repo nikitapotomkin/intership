@@ -3,6 +3,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { getRedisConfig } from 'src/config/redis.config';
 
 export const REDIS_CLIENT = 'REDIS_CLIENT';
+export const REDIS_PUB = 'REDIS_PUB';
+export const REDIS_SUB = 'REDIS_SUB';
 
 @Global()
 @Module({
@@ -13,7 +15,20 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
       useFactory: getRedisConfig,
       inject: [ConfigService],
     },
+    {
+      provide: REDIS_PUB,
+      useFactory: getRedisConfig,
+      inject: [ConfigService],
+    },
+    {
+      provide: REDIS_SUB,
+      useFactory: (config: ConfigService) => {
+        const redis = getRedisConfig(config);
+        return redis.duplicate();
+      },
+      inject: [ConfigService],
+    },
   ],
-  exports: [REDIS_CLIENT],
+  exports: [REDIS_CLIENT, REDIS_PUB, REDIS_SUB],
 })
 export class RedisModule {}

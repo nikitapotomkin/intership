@@ -10,6 +10,8 @@ import { MailerModule } from 'src/mailer/mailer.module';
 import { TokenRepository } from './repositories/token.repository';
 import { PaymentModule } from 'src/payment/payment.module';
 import { GoogleStrategy } from './strategies/google.strategy';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
+import { UserProviderRepository } from './repositories/user-provider.repository';
 
 @Module({
   imports: [MailerModule,PaymentModule],
@@ -20,7 +22,9 @@ import { GoogleStrategy } from './strategies/google.strategy';
     { provide: APP_GUARD, useClass: BannedUserGuard },
     UserRepository,
     TokenRepository,
-    GoogleStrategy
+    UserProviderRepository,
+    GoogleStrategy,
+    GoogleAuthGuard
   ],
   controllers: [AuthController],
   exports: [AuthService],

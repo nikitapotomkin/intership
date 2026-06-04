@@ -17,6 +17,21 @@ enum WithdrawStatus {
   REJECTED  
 }
 
+enum TransactionStatus {
+  PENDING 
+  COMPLETED    
+  FAILED       
+  CANCELED   
+}
+
+enum PaymentProviderType {
+  CARD
+  CRYPTO
+  WALLET
+  BANK
+  OTHER
+}
+
 enum Role {
   USER
   ADMIN
@@ -29,6 +44,12 @@ enum TransactionType {
   BET
   WIN
   REFUND
+}
+
+enum AuthProvider {
+  GOOGLE
+  GITHUB
+  DISCORD
 }
 
 enum BetType {
@@ -67,8 +88,6 @@ model User {
   username    String    @unique @map("username")
   password    String?   @map("password")
   email       String    @unique @map("email")
-  provider    String?   @map("provider")
-  providerId  String?   @map("provider_id")
   isBanned    Boolean   @default(false) @map("is_banned")
   isDeleted   Boolean   @default(false) @map("is_deleted")
   isVerified  Boolean   @default(false) @map("is_verified")
@@ -85,11 +104,26 @@ model User {
   bets         RouletteBet[]
   gameSessions GameSession[]
   withdrawRequests WithdrawRequest[]
-
+  providers UserProvider[]
+  
   @@index([email])
   @@index([createdAt])
   @@index([lastLoginIP])
   @@map("users")
+}
+
+model UserProvider {
+  id         Int          @id @default(autoincrement())
+  userId     Int          @map("user_id")
+  provider   AuthProvider
+  providerId String       @map("provider_id")
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([provider, providerId])
+  @@unique([userId, provider])
+  @@map("user_providers")
 }
 
 model Profile {
@@ -137,14 +171,16 @@ model Transaction {
   amount        Decimal         @db.Decimal(18, 2)
   balanceBefore Decimal         @map("balance_before") @db.Decimal(18, 2)
   balanceAfter  Decimal         @map("balance_after") @db.Decimal(18, 2)
-  referenceId   String?         @map("reference_id")
-  referenceType String?         @map("reference_type")
+  status        TransactionStatus  @default(PENDING) 
+  providerId    Int?            @map("provider_id")
+  externalId    String?         @unique
   createdAt     DateTime        @default(now()) @map("created_at")
 
   wallet Profile @relation(fields: [walletId], references: [userId])
+  provider PaymentProvider? @relation(fields: [providerId], references: [id])
+  withdrawRequest WithdrawRequest?
 
   @@index([walletId, createdAt(sort: Desc)])
-  @@index([referenceId])
   @@map("transactions")
 }
 
@@ -185,19 +221,20 @@ model RouletteBet {
 }
 
 model GameSession {
-  id         String   @id @default(uuid())
-  userId     Int      @map("user_id")
-  serverSeed String   @map("server_seed")
-  serverHash String   @map("server_hash")
-  clientSeed String?  @map("client_seed")
-  nonce      Int      @default(0)
-  isRevealed Boolean  @default(false) @map("is_revealed")
-  createdAt  DateTime @default(now()) @map("created_at")
+  id          String    @id @default(cuid())
+  userId      Int?      @map("user_id")
+  liveRoomId  String?   @map("live_room_id")
+  serverSeed  String    @map("server_seed")
+  serverHash  String    @map("server_hash")
+  clientSeed  String    @default("default-client-seed") @map("client_seed")
+  nonce       Int       @default(0)
+  isRevealed  Boolean   @default(false) @map("is_revealed")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
-  user  User           @relation(fields: [userId], references: [id])
-  round RouletteRound?
+  user        User?             @relation(fields: [userId], references: [id])
+  liveRoom    LiveRouletteRoom? @relation(fields: [liveRoomId], references: [id])
+  round       RouletteRound?
 
-  @@index([userId])
   @@map("game_sessions")
 }
 
@@ -206,14 +243,42 @@ model WithdrawRequest {
   userId    Int            @map("user_id")
   amount    Decimal        @db.Decimal(18, 2)
   status    WithdrawStatus @default(PENDING)
-  cardLast4 String?        @map("card_last4")  // останні 4 цифри картки
-  comment   String?        // причина відхилення
+  cardLast4 String?        @map("card_last4")
+  comment   String?        
   createdAt DateTime       @default(now()) @map("created_at")
   updatedAt DateTime       @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id])
+  transactionId String? @unique @map("transaction_id")
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
 
   @@index([userId])
   @@index([status])
   @@map("withdraw_requests")
+}
+
+model LiveRouletteRoom {
+  id        String   @id @default(cuid())
+  name      String
+  minBet    Decimal  @default(0.01)  @map("min_bet")
+  maxBet    Decimal  @default(100000) @map("max_bet")
+  isActive  Boolean  @default(true)  @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  sessions  GameSession[]
+
+  @@map("live_roulette_rooms")
+}
+
+model PaymentProvider {
+  id          Int  @id @default(autoincrement())
+  name        String   
+  code        String   @unique
+  type        PaymentProviderType
+
+  isActive    Boolean  @default(true) @map("is_active")
+
+  transactions Transaction[]
+
+  @@map("payment_providers")
 }
