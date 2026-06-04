@@ -8,6 +8,7 @@ import { RedisModule } from './redis/redis.module';
 import { WalletModule } from './wallet/wallet.module';
 import { PaymentModule } from './payment/payment.module';
 import { LiveRouletteModule } from './live-roulette/live-roulette.module';
+import { SlotModule } from './slot/slot.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { LiveRouletteModule } from './live-roulette/live-roulette.module';
     PaymentModule,
     AdminModule,
     RedisModule,
+    SlotModule,
     LiveRouletteModule
   ],
 })

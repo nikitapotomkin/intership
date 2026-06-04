@@ -94,6 +94,7 @@ async function bootstrap() {
       'Live Roulette',
       'Game sessions, bets, spin, provably fair verification',
     )
+    .addTag('Slot', 'Spin, history, paytable — 3x5 slot machine with 20 paylines, WILD and SCATTER symbols')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

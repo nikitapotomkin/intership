@@ -41,8 +41,10 @@ enum Role {
 enum TransactionType {
   DEPOSIT
   WITHDRAWAL
-  BET
-  WIN
+  ROULETTE_BET
+  ROULETTE_WIN
+  SLOT_BET
+  SLOT_WIN
   REFUND
 }
 
@@ -105,6 +107,7 @@ model User {
   gameSessions GameSession[]
   withdrawRequests WithdrawRequest[]
   providers UserProvider[]
+  slotRounds SlotRound[]
   
   @@index([email])
   @@index([createdAt])
@@ -281,4 +284,24 @@ model PaymentProvider {
   transactions Transaction[]
 
   @@map("payment_providers")
+}
+
+model SlotRound {
+  id           String   @id @default(uuid())
+  userId       Int      @map("user_id")
+  grid         Json     @map("grid")           
+  winningLines Json     @map("winning_lines")  
+  betPerLine   Decimal  @map("bet_per_line")   @db.Decimal(18, 2)
+  activeLines  Int      @map("active_lines")
+  totalBet     Decimal  @map("total_bet")      @db.Decimal(18, 2)
+  totalPayout  Decimal  @map("total_payout")   @db.Decimal(18, 2)
+  scatterCount Int      @map("scatter_count")
+  isWin        Boolean  @map("is_win")
+  createdAt    DateTime @default(now())        @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([isWin])
+  @@map("slot_rounds")
 }

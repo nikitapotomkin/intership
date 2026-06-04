@@ -68,7 +68,7 @@ export class WalletService {
     });
   }
 
-  async deductBet(tx: any, userId: number, amount: Decimal, betId: string) {
+  async deductBet(tx: any, userId: number, amount: Decimal, transactionType:TransactionType) {
     const profile = await tx.$queryRaw<{ balance: Decimal }[]>`
       SELECT balance FROM profiles WHERE user_id = ${userId} FOR UPDATE
     `;
@@ -89,7 +89,7 @@ export class WalletService {
     await tx.transaction.create({
       data: {
         walletId: userId,
-        type: TransactionType.BET,
+        type: transactionType,
         status: TransactionStatus.COMPLETED,
         amount,
         balanceBefore,
@@ -228,7 +228,7 @@ export class WalletService {
     return { message: `Request ${dto.status.toLowerCase()}` };
   }
 
-  async creditWin(tx: any, userId: number, amount: Decimal, betId: string) {
+  async creditWin(tx: any, userId: number, amount: Decimal, transactionType:TransactionType) {
     const profile = await tx.$queryRaw<{ balance: Decimal }[]>`
       SELECT balance FROM profiles WHERE user_id = ${userId} FOR UPDATE
     `;
@@ -243,7 +243,7 @@ export class WalletService {
     await tx.transaction.create({
       data: {
         walletId: userId,
-        type: TransactionType.WIN,
+        type: transactionType,
         status: TransactionStatus.COMPLETED,
         amount,
         balanceBefore,

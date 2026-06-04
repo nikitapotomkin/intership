@@ -31,6 +31,7 @@ import { createHash, createHmac, randomBytes } from 'crypto';
 import { RouletteRoundRepository } from './repositories/roulette-round.repository';
 import { GameSessionRepository } from './repositories/game-session.repository';
 import { LiveRouletteGateway } from './live-roulette.gateway';
+import { TransactionType } from '@prisma/client';
 
 @Injectable()
 export class LiveRouletteService implements OnModuleDestroy {
@@ -206,7 +207,7 @@ export class LiveRouletteService implements OnModuleDestroy {
         tx,
         userId,
         new Decimal(dto.amount),
-        created.id,
+        TransactionType.ROULETTE_BET,
       );
       return created;
     });
@@ -312,7 +313,7 @@ export class LiveRouletteService implements OnModuleDestroy {
             tx,
             bet.userId,
             new Decimal(payout),
-            bet.betId,
+            TransactionType.ROULETTE_WIN,
           );
         }
 
