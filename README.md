@@ -1,6 +1,4 @@
-# hw-7
-
-Додаємо до ігрового проекту реалізацію функціоналу рулетки з необхідним CRUD, збереженням історії, фіксацією результатів, виведення рейтингу користувача як вдалого гравця. Додаємо до ігрового проекту функціонал фінансових операцій.
+# hw-10
 
 ---
 
@@ -42,6 +40,16 @@ SESSION_FOLDER=sessions:
 # Stripe
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
+
+MAIL_HOST =
+MAIL_PORT =587
+MAIL_LOGIN =
+MAIL_PASSWORD =
+MAIL_FROM =
+
+GOOGLE_CLIENT_ID = 
+GOOGLE_CLIENT_SECRET =
+GOOGLE_CALLBACK_URL = https://d2e3-185-130-54-156.ngrok-free.app/api/v1/auth/google/callback
 ```
 
 ## Local Development
