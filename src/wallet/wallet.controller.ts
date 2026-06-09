@@ -21,7 +21,7 @@ import { CreateWithdrawDto } from './dto/create-withdraw.dto';
 
 @ApiTags('Wallet')
 @ApiCookieAuth('connect.sid')
-@Controller('wallet')
+@Controller('wallets')
 export class WalletController {
   constructor(private readonly walletService: WalletService) {}
 

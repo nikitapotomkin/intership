@@ -291,7 +291,6 @@ export class AuthService {
 
       req.session.save((err) => {
         if (err) {
-          console.log(err, user);
           return reject(
             new InternalServerErrorException(
               `Failed to save session. Check if session parameters are configured correctly`,

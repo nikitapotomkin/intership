@@ -24,7 +24,7 @@ import { DepositDto } from './dto/deposit.dto';
 
 @ApiTags('Payment')
 @ApiCookieAuth('connect.sid')
-@Controller('payment')
+@Controller('payments')
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 

@@ -21,7 +21,7 @@ import { SpinDto } from './dto/spin.dto';
 
 @ApiTags('Slot')
 @ApiCookieAuth('connect.sid')
-@Controller('slot')
+@Controller('slots')
 export class SlotController {
   constructor(private readonly slotService: SlotService) {}
 

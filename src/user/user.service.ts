@@ -17,19 +17,7 @@ import { ListUsersQueryDto } from './dto/list-users-query.dto';
 import { AdjustBalanceDto } from './dto/adjust-balance.dto';
 import { REDIS_CLIENT } from 'src/redis/redis.module';
 import Redis from 'ioredis';
-
-const PUBLIC_USER_SELECT = {
-  id: true,
-  username: true,
-  createdAt: true,
-  profile: {
-    select: {
-      rating: true,
-      level: true,
-      avatar: true,
-    },
-  },
-} as const;
+import { PUBLIC_USER_SELECT } from './user.constants';
 
 @Injectable()
 export class UserService {

@@ -10,27 +10,16 @@ import { IPaymentProvider } from '../interfaces/payment-provider.inderface';
 import { WalletService } from 'src/wallet/wallet.service';
 import { StripeService } from 'src/stripe/stripe.service';
 import { Request } from 'express';
-import { PaymentProviderRepository } from '../repositories/payment.repository';
 import Stripe from 'stripe';
 
 @Injectable()
-export class StripePaymentProvider implements IPaymentProvider, OnModuleInit {
-  private providerId: number;
+export class StripePaymentProvider implements IPaymentProvider {
 
   constructor(
     private readonly stripeService: StripeService,
     private readonly profileRepository: ProfileRepository,
-    private readonly walletService: WalletService,
-    private readonly paymentProviderRepository: PaymentProviderRepository,
+    private readonly walletService: WalletService
   ) {}
-
-  async onModuleInit() {
-    const provider = await this.paymentProviderRepository.findUnique({
-      where: { code: 'stripe' },
-    });
-    if (!provider) throw new Error('Stripe provider not found in DB');
-    this.providerId = provider.id;
-  }
 
   async createDeposit(user: User, amount: number) {
     const profile = await this.profileRepository.findUnique({
@@ -51,7 +40,7 @@ export class StripePaymentProvider implements IPaymentProvider, OnModuleInit {
     return this.stripeService.createDeposit(customerId, amount);
   }
 
-  async handleWebhook(req: RawBodyRequest<Request>) {
+  async handleWebhook(req: RawBodyRequest<Request>,providerId:number) {
     const signature = req.headers['stripe-signature'] as string;
     let event: Stripe.Event;
     try {
@@ -78,7 +67,7 @@ export class StripePaymentProvider implements IPaymentProvider, OnModuleInit {
         await this.walletService.deposit(
           profile.userId,
           amount,
-          this.providerId,
+          providerId,
           externalId,
         );
       } catch (err) {

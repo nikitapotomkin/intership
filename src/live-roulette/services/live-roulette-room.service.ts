@@ -6,15 +6,16 @@ import {
 } from '@nestjs/common';
 import { REDIS_CLIENT } from 'src/redis/redis.module';
 import type { Redis } from 'ioredis';
-import { CreateRoomDto } from './dto/create-room.dto';
-import { RoomState } from './types';
+import { CreateRoomDto } from '../dto/create-room.dto';
+import { RoomState } from '../types';
 import {
   ROOM_KEY,
   ROOMS_LIST_KEY,
   ROOM_STATE_TTL,
   ROOM_BETS_KEY,
-} from './constants/live-roulette.constants';
-import { LiveRouletteRoomRepository } from './repositories/live-roulette-room.repository';
+  ROOM_PLAYER_COUNT_KEY,
+} from '../live-roulette.constants';
+import { LiveRouletteRoomRepository } from '../repositories/live-roulette-room.repository';
 
 @Injectable()
 export class LiveRouletteRoomService {
@@ -50,6 +51,7 @@ export class LiveRouletteRoomService {
     };
 
     await this.saveRoomState(state);
+    await this.redis.set(ROOM_PLAYER_COUNT_KEY(room.id), 0);
     await this.redis.sadd(ROOMS_LIST_KEY, room.id);
 
     return state;
@@ -57,6 +59,7 @@ export class LiveRouletteRoomService {
 
   async getRoomState(roomId: string): Promise<RoomState> {
     const raw = await this.redis.get(ROOM_KEY(roomId));
+
     if (!raw) {
       const room = await this.liveRouletteRoomRepository.findUnique({
         where: { id: roomId },
@@ -70,7 +73,7 @@ export class LiveRouletteRoomService {
         phase: 'WAITING',
         timeLeft: 0,
         currentRoundId: null,
-        playerCount: 0,
+        playerCount: await this.getPlayerCount(roomId),
         minBet: Number(room.minBet),
         maxBet: Number(room.maxBet),
         lastResult: null,
@@ -78,7 +81,10 @@ export class LiveRouletteRoomService {
       await this.saveRoomState(state);
       return state;
     }
-    return JSON.parse(raw) as RoomState;
+
+    const state = JSON.parse(raw) as RoomState;
+    state.playerCount = await this.getPlayerCount(roomId);
+    return state;
   }
 
   async saveRoomState(state: RoomState): Promise<void> {
@@ -104,16 +110,31 @@ export class LiveRouletteRoomService {
     return states.filter(Boolean) as RoomState[];
   }
 
-  async incrementPlayerCount(roomId: string): Promise<void> {
-    const state = await this.getRoomState(roomId);
-    state.playerCount = Math.max(0, state.playerCount + 1);
-    await this.saveRoomState(state);
+  async incrementPlayerCount(roomId: string): Promise<number> {
+    const count = await this.redis.incr(ROOM_PLAYER_COUNT_KEY(roomId));
+    return count;
   }
 
-  async decrementPlayerCount(roomId: string): Promise<void> {
-    const state = await this.getRoomState(roomId);
-    state.playerCount = Math.max(0, state.playerCount - 1);
-    await this.saveRoomState(state);
+  async decrementPlayerCount(roomId: string): Promise<number> {
+    const script = `
+      local val = redis.call("decr", KEYS[1])
+      if val < 0 then
+        redis.call("set", KEYS[1], 0)
+        return 0
+      end
+      return val
+    `;
+    const count = await this.redis.eval(
+      script,
+      1,
+      ROOM_PLAYER_COUNT_KEY(roomId),
+    ) as number;
+    return count;
+  }
+
+  async getPlayerCount(roomId: string): Promise<number> {
+    const val = await this.redis.get(ROOM_PLAYER_COUNT_KEY(roomId));
+    return val ? parseInt(val) : 0;
   }
 
   async deactivateRoom(roomId: string): Promise<void> {
@@ -143,6 +164,7 @@ export class LiveRouletteRoomService {
 
     await this.redis.del(ROOM_KEY(roomId));
     await this.redis.del(ROOM_BETS_KEY(roomId));
+    await this.redis.del(ROOM_PLAYER_COUNT_KEY(roomId));
     await this.redis.srem(ROOMS_LIST_KEY, roomId);
 
     await this.liveRouletteRoomRepository.delete(roomId);

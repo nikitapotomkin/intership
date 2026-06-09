@@ -1,99 +1,193 @@
-# hw-10
+# Intership — Online Game Platform API
 
----
+A **NestJS** backend for an online gaming platform. Supports authentication, wallet transactions, Stripe deposits, live roulette, slot machine, and real-time PvP battles.
+
+## Features
+
+| Module | Description |
+|--------|-------------|
+| **Auth** | Registration, login, email verification, password recovery, Google OAuth |
+| **User** | Profile, address, password management |
+| **Wallet** | Balance, transaction history, withdrawal requests |
+| **Payment** | Deposits via payment providers, Stripe webhooks |
+| **Live Roulette** | Live rooms, bets, spin, provably fair (server/client seed) |
+| **Slot** | 3×5 slot, 20 paylines, WILD and SCATTER symbols |
+| **Battle** | PvP duels over WebSocket (`/battle`) |
+| **Admin** | User management, bans, roles, withdrawals, live rooms |
+
+## Tech Stack
+
+- **Runtime:** Node.js 22+
+- **Framework:** NestJS 11
+- **Database:** PostgreSQL 16 + Prisma ORM
+- **Cache / Sessions:** Redis 7
+- **Real-time:** Socket.IO with Redis adapter
+- **Payments:** Stripe
+- **API Docs:** Swagger
 
 ## Requirements
 
 - Node.js 22+
-- Docker & Docker Compose
+- Docker & Docker Compose (for containerized setup)
+- PostgreSQL and Redis (if running locally without Docker)
 
-## Environment
+## Quick Start
 
-Create `.env` file in the root directory:
+### 1. Clone and install dependencies
+
+```bash
+git clone <repository-url>
+cd intership
+npm install
+```
+
+### 2. Environment setup
+
+Create a `.env` file in the project root:
 
 ```env
-# Database
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_DB=online_game
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/online_game?schema=public
 
-# Redis
-REDIS_HOST=localhost
+REDIS_HOST=redis
 REDIS_PORT=6379
 
-# App
 NODE_ENV=production
 PORT=2345
-ALLOWED_ORIGIN=http://localhost:3000
 
-# Session
-COOKIES_SECRET=
-SESSION_SECRET=
+COOKIES_SECRET=game123
+SESSION_SECRET=game123
 SESSION_NAME=Session
-SESSION_DOMAIN=localhost
 SESSION_MAX_AGE_30DAYS=2592000000
 SESSION_HTTP_ONLY=true
 SESSION_SECURE=false
 SESSION_FOLDER=sessions:
 
-# Stripe
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
+ALLOWED_ORIGIN =http://localhost:3000
 
-MAIL_HOST =
+STRIPE_SECRET_KEY=sk_test_51
+STRIPE_WEBHOOK_SECRET=whsec_6
+
+MAIL_HOST =test
 MAIL_PORT =587
-MAIL_LOGIN =
-MAIL_PASSWORD =
-MAIL_FROM =
+MAIL_LOGIN =test
+MAIL_PASSWORD =test
+MAIL_FROM =test
 
-GOOGLE_CLIENT_ID = 
-GOOGLE_CLIENT_SECRET =
+GOOGLE_CLIENT_ID =test
+GOOGLE_CLIENT_SECRET =test
 GOOGLE_CALLBACK_URL = https://d2e3-185-130-54-156.ngrok-free.app/api/v1/auth/google/callback
 ```
 
-## Local Development
+> **Note:** `COOKIES_SECRET` and `SESSION_SECRET` must be long random strings. For Google OAuth, the callback URL must match the settings in Google Cloud Console.
+
+### 3. Database
 
 ```bash
-# Install dependencies
-npm install
-
-# Generate Prisma client
 npx prisma generate
-
-# Run migrations
 npx prisma migrate dev
-
-# Start in watch mode
-npm run start:dev
 ```
+
+### 4. Run the app
+
+```bash
+# Development mode (hot-reload)
+npm run start:dev
+
+# Production
+npm run build
+npm run start:prod
+```
+
+The server will be available at `http://localhost:2345`.
 
 ## Docker
 
-```bash
-# Build and start all services
-docker-compose up --build
+Start all services (PostgreSQL, Redis, app):
 
-# Stop all services
+```bash
+docker-compose up --build -d
+```
+
+Stop:
+
+```bash
 docker-compose down
 
 # Stop and remove volumes
 docker-compose down -v
 ```
 
+In Docker mode, `DATABASE_URL` and `REDIS_HOST` are overridden automatically via `docker-compose.yml`.
+
+## API Documentation
+
+Swagger UI: **http://localhost:2345/api/docs**
+
+Authentication uses cookie-based sessions (`connect.sid`). After `POST /api/v1/auth/login`, the cookie is sent automatically with subsequent requests.
+
+### Main endpoints
+
+| Prefix | Description |
+|--------|-------------|
+| `/api/v1/auth` | Registration, login, logout, Google OAuth |
+| `/api/v1/users` | Profile, address |
+| `/api/v1/wallets` | Balance, withdrawals, history |
+| `/api/v1/payments` | Deposits, webhooks |
+| `/api/v1/live-roulette/rooms` | Live roulette rooms |
+| `/api/v1/slots` | Spin, history, paytable |
+| `/api/v1/battles` | PvP duels (REST) |
+| `/api/v1/admin` | Admin panel (ADMIN role) |
+
+### WebSocket namespaces
+
+| Namespace | Description |
+|-----------|-------------|
+| `/live-roulette` | Live roulette: join room, place bets, spin results |
+| `/battle` | PvP battles: moves, battle status |
+
+WebSocket connections require an active session (cookie is passed during handshake).
+
 ## Database
 
 ```bash
-# Create migration
+# Create a migration
 npx prisma migrate dev --name migration_name
 
 # Apply migrations (production)
 npx prisma migrate deploy
 
-# Open Prisma Studio
-npx prisma studio
+## Project Structure
+
+```
+intership/
+├── prisma/              # DB schema and migrations
+├── src/
+│   ├── admin/           # Admin operations
+│   ├── auth/            # Authentication and OAuth
+│   ├── battle/          # PvP duels (REST + WebSocket)
+│   ├── live-roulette/   # Live roulette (REST + WebSocket)
+│   ├── payment/         # Deposits and webhooks
+│   ├── slot/            # Slot machine
+│   ├── stripe/          # Stripe integration
+│   ├── user/            # Users and profiles
+│   ├── wallet/          # Wallet and transactions
+│   ├── common/          # Decorators, guards, utilities
+│   ├── config/          # Configuration
+│   ├── database/        # Prisma service
+│   └── redis/           # Redis module
+├── public/              # Static files (e.g. battle_test.html)
+├── docker-compose.yml
+├── Dockerfile
+└── entrypoint.sh
 ```
 
-## API Docs
+## User Roles
 
-Swagger UI available at: `http://localhost:2345/api/docs`
+- `USER` — regular player
+- `MODERATOR` — moderation access
+- `ADMIN` — full access to admin endpoints
+
+---

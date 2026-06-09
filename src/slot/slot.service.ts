@@ -13,7 +13,7 @@ import {
   PAYTABLE,
   SCATTER_PAYTABLE,
   SlotSymbol,
-} from './constants/slot.constants';
+} from './slot.constants';
 import { SlotGrid } from './types/slot.grid';
 import { WinningLine } from './types/winning-line.type';
 import { SpinResult } from './types/spin-result.type';

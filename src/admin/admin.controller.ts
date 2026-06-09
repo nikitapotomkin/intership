@@ -32,8 +32,8 @@ import { UserService } from 'src/user/user.service';
 import { WalletService } from 'src/wallet/wallet.service';
 import { ReviewWithdrawDto } from 'src/wallet/dto/review-withdraw.dto';
 import { CreateRoomDto } from 'src/live-roulette/dto/create-room.dto';
-import { LiveRouletteRoomService } from 'src/live-roulette/live-roulette-room.service';
-import { LiveRouletteService } from 'src/live-roulette/live-roulette.service';
+import { LiveRouletteRoomService } from 'src/live-roulette/services/live-roulette-room.service';
+import { LiveRouletteService } from 'src/live-roulette/services/live-roulette.service';
 
 @ApiTags('Admin')
 @ApiCookieAuth('connect.sid')

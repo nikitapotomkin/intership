@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from './database/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
@@ -9,6 +9,8 @@ import { WalletModule } from './wallet/wallet.module';
 import { PaymentModule } from './payment/payment.module';
 import { LiveRouletteModule } from './live-roulette/live-roulette.module';
 import { SlotModule } from './slot/slot.module';
+import { BattleModule } from './battle/battle.module';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
@@ -21,7 +23,14 @@ import { SlotModule } from './slot/slot.module';
     AdminModule,
     RedisModule,
     SlotModule,
-    LiveRouletteModule
+    LiveRouletteModule,
+    BattleModule,
+    BullModule.forRoot({
+      connection: {
+        host: process.env.REDIS_HOST,
+        port: Number(process.env.REDIS_PORT),
+      },
+    }),
   ],
 })
 export class AppModule {}

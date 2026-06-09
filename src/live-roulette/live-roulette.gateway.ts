@@ -9,53 +9,50 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { forwardRef, Inject, Injectable, UseGuards } from '@nestjs/common';
-import { LiveRouletteService } from './live-roulette.service';
-import { LiveRouletteRoomService } from './live-roulette-room.service';
+import { LiveRouletteService } from './services/live-roulette.service';
+import { LiveRouletteRoomService } from './services/live-roulette-room.service';
 import { WsAuthGuard } from 'src/common/guards/ws-auth.guard';
 import { LeaveRoomDto } from './dto/leave-room.dto';
 import { LivePlaceBetDto } from './dto/live-place-bet.dto';
 import { JoinRoomDto } from './dto/join-room.dto';
-import { REDIS_CLIENT, REDIS_PUB, REDIS_SUB } from 'src/redis/redis.module';
+import { REDIS_CLIENT } from 'src/redis/redis.module';
 import Redis from 'ioredis';
+import { SOCKET_ROOMS_KEY, SOCKET_ROOMS_TTL } from './live-roulette.constants';
 
 @UseGuards(WsAuthGuard)
 @WebSocketGateway({
   namespace: '/live-roulette',
-  cors: {
-    origin: true, //process.env.ALLOWED_ORIGIN_ALL?.split(','),
-    credentials: true,
-  },
+  cors: { origin: true, credentials: true },
 })
 @Injectable()
 export class LiveRouletteGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
+  @WebSocketServer() server: Server;
+
   constructor(
     @Inject(forwardRef(() => LiveRouletteService))
     private readonly liveService: LiveRouletteService,
     private readonly roomService: LiveRouletteRoomService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
-    @Inject(REDIS_PUB) private readonly pubClient: Redis,
-    @Inject(REDIS_SUB) private readonly subClient: Redis,
   ) {}
 
-  @WebSocketServer()
-  server: Server;
-
-  sendToRoom(room: string, event: string, message: any) {
-    this.server.to(room).emit(event, message);
+  sendToRoom<T>(roomId: string, event: string, data: T): void {
+    this.server.to(roomId).emit(event, data);
   }
 
-  async handleConnection() {
-    console.log('Connected successfully to WS!');
+  handleConnection(client: Socket) {
+    console.log(`LiveRoulette connected: ${client.id}`);
   }
 
   async handleDisconnect(client: Socket) {
-    const rooms = await this.redis.smembers(`socket:rooms:${client.id}`);
-    for (const roomId of rooms) {
-      await this.leaveRoom(client, roomId);
-    }
-    await this.redis.del(`socket:rooms:${client.id}`);
+    const rooms = await this.redis.smembers(SOCKET_ROOMS_KEY(client.id));
+
+    await Promise.allSettled(
+      rooms.map((roomId) => this.leaveRoom(client, roomId)),
+    );
+
+    await this.redis.del(SOCKET_ROOMS_KEY(client.id));
   }
 
   @SubscribeMessage('live_roulette:join')
@@ -70,13 +67,22 @@ export class LiveRouletteGateway
         client.emit('live_roulette:error', { message: 'Room is not active' });
         return;
       }
-      
+
+      const alreadyJoined = await this.redis.sismember(
+        SOCKET_ROOMS_KEY(client.id),
+        dto.roomId,
+      );
+      if (alreadyJoined) {
+        client.emit('live_roulette:state', await this.roomService.getRoomState(dto.roomId));
+        return;
+      }
+
       client.join(dto.roomId);
-      await this.redis.sadd(`socket:rooms:${client.id}`, dto.roomId);
-      await this.redis.expire(`socket:rooms:${client.id}`, 3600);
+      await this.redis.sadd(SOCKET_ROOMS_KEY(client.id), dto.roomId);
+      await this.redis.expire(SOCKET_ROOMS_KEY(client.id), SOCKET_ROOMS_TTL);
       await this.roomService.incrementPlayerCount(dto.roomId);
 
-      this.liveService.startRoomLoop(dto.roomId);
+      await this.liveService.startRoomLoop(dto.roomId);
 
       client.emit(
         'live_roulette:state',
@@ -94,8 +100,10 @@ export class LiveRouletteGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() dto: LeaveRoomDto,
   ) {
-    await this.redis.srem(`socket:rooms:${client.id}`, dto.roomId);
-    await this.leaveRoom(client, dto.roomId);
+    const wasJoined = await this.redis.srem(SOCKET_ROOMS_KEY(client.id), dto.roomId);
+    if (wasJoined) {
+      await this.leaveRoom(client, dto.roomId);
+    }
   }
 
   @SubscribeMessage('live_roulette:place_bet')
@@ -105,11 +113,21 @@ export class LiveRouletteGateway
   ) {
     const userId = client.data.user.id;
 
+    const isJoined = await this.redis.sismember(
+      SOCKET_ROOMS_KEY(client.id),
+      dto.roomId,
+    );
+
+    if (!isJoined) {
+      client.emit('live_roulette:error', { message: 'Join room first' });
+      return;
+    }
+
     try {
       await this.liveService.placeBet(userId, dto);
     } catch (err) {
       client.emit('live_roulette:error', {
-        message: err instanceof Error ? err.message : 'bet Failed',
+        message: err instanceof Error ? err.message : 'Bet failed',
       });
     }
   }
@@ -118,7 +136,7 @@ export class LiveRouletteGateway
   async onListRooms(@ConnectedSocket() client: Socket) {
     try {
       const rooms = await this.roomService.listRooms();
-      return rooms;
+      client.emit('live_roulette:rooms', rooms);
     } catch (err) {
       client.emit('live_roulette:error', { message: 'Failed to list rooms' });
     }

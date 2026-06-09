@@ -26,19 +26,24 @@ export class PaymentService {
       where: { code: dto.provider },
     });
 
-    if (!paymentProvider)
+    const provider = this.providers.get(dto.provider);
+
+    if (!paymentProvider || !provider)
       throw new BadRequestException('Unknown payment provider');
     if (!paymentProvider.isActive)
       throw new BadRequestException(`Provider ${dto.provider} is disabled`);
 
-    const provider = this.providers.get(dto.provider);
-    if (!provider) throw new BadRequestException('Unknown payment provider');
     return provider.createDeposit(user, dto.amount);
   }
 
   async handleWebhook(provider: string, req: RawBodyRequest<Request>) {
+    const paymentProvider = await this.paymentProviderRepository.findUnique({
+      where: { code: provider },
+    });
+
     const p = this.providers.get(provider);
-    if (!p) throw new BadRequestException('Unknown payment provider');
-    return p.handleWebhook(req);
+    if (!p || !paymentProvider) return;
+      
+    return p.handleWebhook(req, paymentProvider.id);
   }
 }

@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battle Gateway — WS Test</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #151820;
+    --border: #252a36;
+    --accent: #e84545;
+    --accent-dim: rgba(232,69,69,.15);
+    --green: #39d98a;
+    --green-dim: rgba(57,217,138,.12);
+    --yellow: #f5c842;
+    --muted: #5a6278;
+    --text: #dde1ed;
+    --text-dim: #8891aa;
+    --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --sans: 'Inter', system-ui, sans-serif;
+    --radius: 8px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -.4px;
+    color: var(--text);
+  }
+  .logo span { color: var(--accent); }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--border);
+    color: var(--muted);
+    margin-left: auto;
+  }
+  .status-pill.connected { background: var(--green-dim); color: var(--green); }
+  .status-pill.error     { background: var(--accent-dim); color: var(--accent); }
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .dot.pulse { animation: pulse 1.4s infinite; }
+  @keyframes pulse {
+    0%,100% { opacity: 1; } 50% { opacity: .3; }
+  }
+
+  main {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 0;
+    overflow: hidden;
+    height: calc(100vh - 61px);
+  }
+
+  .panel {
+    padding: 20px;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+  }
+
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .block { margin-bottom: 24px; }
+
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+  }
+
+  input, textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 8px 10px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+  textarea { resize: vertical; min-height: 70px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: opacity .15s, transform .1s;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { background: var(--border); color: var(--text); }
+  .btn-success { background: var(--green); color: #0d0f14; }
+  .btn-danger  { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent); }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .event-btn {
+    width: 100%;
+    text-align: left;
+    justify-content: flex-start;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .event-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .event-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-right: 4px;
+  }
+
+  /* Log pane */
+  .log-pane {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .log-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .log-header h2 { font-size: 13px; font-weight: 600; }
+  .clear-btn {
+    margin-left: auto;
+    font-size: 12px;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 4px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .clear-btn:hover { color: var(--text); border-color: var(--text); }
+
+  #log {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+  }
+
+  .log-entry {
+    display: grid;
+    grid-template-columns: 70px 90px 1fr;
+    gap: 10px;
+    align-items: start;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    animation: slideIn .2s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .log-entry.outgoing { border-color: rgba(232,69,69,.3); }
+  .log-entry.incoming { border-color: rgba(57,217,138,.3); }
+  .log-entry.system   { border-color: rgba(245,200,66,.3); }
+
+  .log-time  { color: var(--muted); font-size: 11px; padding-top: 1px; }
+  .log-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .05em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-align: center;
+    align-self: start;
+  }
+  .badge-out { background: var(--accent-dim); color: var(--accent); }
+  .badge-in  { background: var(--green-dim);  color: var(--green); }
+  .badge-sys { background: rgba(245,200,66,.15); color: var(--yellow); }
+
+  .log-event { font-weight: 600; color: var(--text); margin-bottom: 3px; }
+  .log-data  { color: var(--text-dim); white-space: pre-wrap; word-break: break-all; }
+
+  /* Battle state widget */
+  .battle-state {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+  .hp-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .hp-label { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .hp-value { font-family: var(--mono); font-size: 16px; font-weight: 700; }
+  .hp-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 12px; }
+  .hp-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width .4s ease; }
+  .hp-fill.low { background: var(--accent); }
+  .state-meta { display: flex; gap: 10px; flex-wrap: wrap; }
+  .meta-chip {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .meta-chip b { color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚔️ Battle<span>GW</span></div>
+  <div class="status-pill" id="statusPill">
+    <span class="dot"></span> Disconnected
+  </div>
+</header>
+
+<main>
+  <!-- Left panel -->
+  <div class="panel">
+
+    <!-- Connection -->
+    <div class="block">
+      <div class="section-title">Connection</div>
+      <label>Server URL</label>
+      <input id="serverUrl" value="http://localhost:3000/battle" placeholder="http://localhost:3000/battle" style="margin-bottom:8px">
+      <label>JWT Token</label>
+      <input id="jwtToken" placeholder="eyJhbGci..." type="password" style="margin-bottom:10px">
+      <div class="btn-row">
+        <button class="btn btn-primary" id="connectBtn" onclick="connect()">Connect</button>
+        <button class="btn btn-danger" id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+      </div>
+    </div>
+
+    <!-- Battle state display -->
+    <div class="block" id="stateBlock" style="display:none">
+      <div class="section-title">Live State</div>
+      <div class="battle-state">
+        <div class="hp-row">
+          <span class="hp-label">Player 1 HP</span>
+          <span class="hp-value" id="p1hp">—</span>
+        </div>
+        <div class="hp-bar"><div class="hp-fill" id="p1bar" style="width:100%"></div></div>
+        <div class="hp-row">
+          <span class="hp-label">Player 2 HP</span>
+          <span class="hp-value" id="p2hp">—</span>
+        </div>
+        <div class="hp-bar"><div class="hp-fill" id="p2bar" style="width:100%"></div></div>
+        <div class="state-meta">
+          <div class="meta-chip">Room <b id="sRoomId">—</b></div>
+          <div class="meta-chip">Round <b id="sRound">—</b></div>
+          <div class="meta-chip">Status <b id="sStatus">—</b></div>
+          <div class="meta-chip">Winner <b id="sWinner">—</b></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Events -->
+    <div class="block">
+      <div class="section-title">Quick Events</div>
+
+      <label>Room ID</label>
+      <input id="roomId" value="room-001" style="margin-bottom:10px">
+
+      <button class="btn event-btn" onclick="sendJoin()">
+        <span class="event-tag">EMIT</span> battle:join
+      </button>
+      <button class="btn event-btn" onclick="sendLeave()">
+        <span class="event-tag">EMIT</span> battle:leave
+      </button>
+    </div>
+
+    <!-- Custom emit -->
+    <div class="block">
+      <div class="section-title">Custom Emit</div>
+      <label>Event name</label>
+      <input id="customEvent" value="battle:join" style="margin-bottom:8px">
+      <label>Payload (JSON)</label>
+      <textarea id="customPayload">{"roomId":"room-001"}</textarea>
+      <br>
+      <button class="btn btn-secondary" onclick="sendCustom()" style="margin-top:6px">Send</button>
+    </div>
+
+  </div>
+
+  <!-- Right log pane -->
+  <div class="log-pane">
+    <div class="log-header">
+      <h2>Event Log</h2>
+      <button class="clear-btn" onclick="clearLog()">Clear</button>
+    </div>
+    <div id="log"></div>
+  </div>
+</main>
+
+<script>
+let socket = null;
+
+function connect() {
+  const url   = document.getElementById('serverUrl').value.trim();
+  const token = document.getElementById('jwtToken').value.trim();
+
+  log('sys', 'connect', `Connecting to ${url}…`);
+
+  socket = io(url, {
+    transports: ['websocket'],
+    auth: token ? { token } : {},
+    withCredentials: true,
+  });
+
+  socket.on('connect', () => {
+    setStatus('connected');
+    log('sys', 'connect', `Socket ID: ${socket.id}`);
+    document.getElementById('connectBtn').disabled = true;
+    document.getElementById('disconnectBtn').disabled = false;
+  });
+
+  socket.on('disconnect', (reason) => {
+    setStatus('disconnected');
+    log('sys', 'disconnect', reason);
+    document.getElementById('connectBtn').disabled = false;
+    document.getElementById('disconnectBtn').disabled = true;
+    document.getElementById('stateBlock').style.display = 'none';
+  });
+
+  socket.on('connect_error', (err) => {
+    setStatus('error');
+    log('sys', 'connect_error', err.message);
+  });
+
+  socket.on('battle:state', (data) => {
+    log('in', 'battle:state', data);
+    updateState(data);
+  });
+
+  socket.on('battle:round_result', (data) => {
+    log('in', 'battle:round_result', data);
+    updateState(data);
+  });
+
+  socket.on('battle:error', (data) => {
+    log('in', 'battle:error', data);
+  });
+
+  // Catch-all for any other server events
+  socket.onAny((event, ...args) => {
+    if (!['battle:state','battle:round_result','battle:error'].includes(event)) {
+      log('in', event, args.length === 1 ? args[0] : args);
+    }
+  });
+}
+
+function disconnect() {
+  if (socket) { socket.disconnect(); socket = null; }
+}
+
+function sendJoin() {
+  const roomId = document.getElementById('roomId').value.trim();
+  emit('battle:join', { roomId });
+}
+
+function sendLeave() {
+  const roomId = document.getElementById('roomId').value.trim();
+  emit('battle:leave', { roomId });
+}
+
+function sendCustom() {
+  const event = document.getElementById('customEvent').value.trim();
+  let payload;
+  try { payload = JSON.parse(document.getElementById('customPayload').value); }
+  catch { payload = document.getElementById('customPayload').value; }
+  emit(event, payload);
+}
+
+function emit(event, data) {
+  if (!socket?.connected) { log('sys', 'error', 'Not connected'); return; }
+  socket.emit(event, data);
+  log('out', event, data);
+}
+
+/* ---- UI helpers ---- */
+
+function setStatus(state) {
+  const pill = document.getElementById('statusPill');
+  const dot  = pill.querySelector('.dot');
+  pill.className = 'status-pill ' + (state === 'connected' ? 'connected' : state === 'error' ? 'error' : '');
+  dot.className  = 'dot ' + (state === 'connected' ? 'pulse' : '');
+  pill.querySelector('span:last-child')?.remove();
+  const label = document.createElement('span');
+  label.textContent = state === 'connected' ? 'Connected' : state === 'error' ? 'Error' : 'Disconnected';
+  pill.appendChild(label);
+}
+
+function log(dir, event, data) {
+  const el = document.getElementById('log');
+  const entry = document.createElement('div');
+  const dirMap = { out: 'outgoing', in: 'incoming', sys: 'system' };
+  const badgeMap = { out: 'badge-out', in: 'badge-in', sys: 'badge-sys' };
+  const labelMap = { out: '▲ SEND', in: '▼ RECV', sys: '● SYS' };
+
+  entry.className = `log-entry ${dirMap[dir]}`;
+  const now = new Date();
+  const ts  = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+  const dataStr = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
+
+  entry.innerHTML = `
+    <span class="log-time">${ts}</span>
+    <span class="log-badge ${badgeMap[dir]}">${labelMap[dir]}</span>
+    <div class="log-body">
+      <div class="log-event">${event}</div>
+      <div class="log-data">${dataStr}</div>
+    </div>
+  `;
+  el.appendChild(entry);
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('log').innerHTML = '';
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function updateState(data) {
+  document.getElementById('stateBlock').style.display = 'block';
+  document.getElementById('p1hp').textContent = data.player1Health ?? '—';
+  document.getElementById('p2hp').textContent = data.player2Health ?? '—';
+  document.getElementById('sRoomId').textContent  = data.roomId  ?? '—';
+  document.getElementById('sRound').textContent   = data.currentRound ?? '—';
+  document.getElementById('sStatus').textContent  = data.status  ?? '—';
+  document.getElementById('sWinner').textContent  = data.winnerId ?? 'none';
+
+  const maxHp = 100;
+  setBar('p1bar', data.player1Health, maxHp);
+  setBar('p2bar', data.player2Health, maxHp);
+}
+
+function setBar(id, hp, max) {
+  const bar = document.getElementById(id);
+  const pct = Math.max(0, Math.min(100, (hp / max) * 100));
+  bar.style.width = pct + '%';
+  bar.className   = 'hp-fill' + (pct < 30 ? ' low' : '');
+}
+</script>
+</body>
+</html>
