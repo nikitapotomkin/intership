@@ -158,30 +158,6 @@ npx prisma migrate dev --name migration_name
 
 # Apply migrations (production)
 npx prisma migrate deploy
-
-## Project Structure
-
-```
-intership/
-├── prisma/              # DB schema and migrations
-├── src/
-│   ├── admin/           # Admin operations
-│   ├── auth/            # Authentication and OAuth
-│   ├── battle/          # PvP duels (REST + WebSocket)
-│   ├── live-roulette/   # Live roulette (REST + WebSocket)
-│   ├── payment/         # Deposits and webhooks
-│   ├── slot/            # Slot machine
-│   ├── stripe/          # Stripe integration
-│   ├── user/            # Users and profiles
-│   ├── wallet/          # Wallet and transactions
-│   ├── common/          # Decorators, guards, utilities
-│   ├── config/          # Configuration
-│   ├── database/        # Prisma service
-│   └── redis/           # Redis module
-├── public/              # Static files (e.g. battle_test.html)
-├── docker-compose.yml
-├── Dockerfile
-└── entrypoint.sh
 ```
 
 ## User Roles
